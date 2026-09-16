@@ -2,9 +2,32 @@ import telebot
 from telebot import types
 import sqlite3
 import time
+import os
+from threading import Thread
+from http.server import HTTPServer, BaseHTTPRequestHandler
 
+# --- Render সার্ভারের জন্য পোর্ট কানেকশন ---
+PORT = int(os.environ.get("PORT", 10000))
+
+class SimpleHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header('Content-type', 'text/html')
+        self.end_headers()
+        self.wfile.write(b"NEOX Bot is Running 24/7!")
+        
+    def log_message(self, format, *args):
+        return
+
+def run_server():
+    server = HTTPServer(('0.0.0.0', PORT), SimpleHandler)
+    server.serve_forever()
+
+Thread(target=run_server, daemon=True).start()
+
+# --- বটের মূল কোড ---
 BOT_TOKEN = "8843310193:AAH9ViXDNIi94hQnuZLjmiLe3UhtaaUM77U"
-ADMIN_ID = 7241161752  # আপনার অ্যাডমিন আইডি
+ADMIN_ID = 7241161752
 
 bot = telebot.TeleBot(BOT_TOKEN)
 
@@ -230,5 +253,5 @@ def do_add_balance(message):
     except:
         bot.send_message(ADMIN_ID, "⚠️ ভুল ফরম্যাট! সঠিক ফরম্যাট: UserID Amount")
 
-print("বট সফলভাবে চালু হয়েছে...")
+print("বট ২৪ ঘণ্টার সার্ভার মোডে চালু হয়েছে...")
 bot.infinity_polling()
