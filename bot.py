@@ -29,7 +29,7 @@ class SimpleHandler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header('Content-type', 'text/html')
         self.end_headers()
-        self.wfile.write(b"NEOX FAST SMS (Clean UI & Native 1-Click Copy Active)")
+        self.wfile.write(b"NEOX FAST SMS Server Online")
         
     def log_message(self, format, *args):
         return
@@ -50,7 +50,7 @@ bot = telebot.TeleBot(BOT_TOKEN)
 conn = sqlite3.connect("bot_users.db", check_same_thread=False)
 cursor = conn.cursor()
 
-# টেবিল তৈরি
+# টেবিলসমূহ তৈরি
 cursor.execute('''CREATE TABLE IF NOT EXISTS users (
     user_id INTEGER PRIMARY KEY, balance REAL DEFAULT 0.0, total_otp INTEGER DEFAULT 0, referrer INTEGER DEFAULT NULL
 )''')
@@ -76,13 +76,6 @@ cursor.execute('''CREATE TABLE IF NOT EXISTS countries (
 )''')
 conn.commit()
 
-# পুরোনো ডেটাবেজে assigned_service কলাম মিসিং থাকলে নিরাপদ সমাধান
-try:
-    cursor.execute("ALTER TABLE numbers ADD COLUMN assigned_service TEXT DEFAULT 'FACEBOOK'")
-    conn.commit()
-except:
-    pass
-
 # ডিফল্ট সার্ভিস ও কান্ট্রি লোড
 cursor.execute("SELECT COUNT(*) FROM services")
 if cursor.fetchone()[0] == 0:
@@ -90,13 +83,13 @@ if cursor.fetchone()[0] == 0:
         cursor.execute("INSERT OR IGNORE INTO services (name) VALUES (?)", (s,))
     
     default_countries = [
-        ("FACEBOOK", "🇲🇲 Myanmar Top (1166)", "Myanmar"),
-        ("FACEBOOK", "🇪🇬 Egypt S1 (9719)", "Egypt"),
-        ("FACEBOOK", "🇸🇩 Sudan FB 🔥 (874)", "Sudan"),
-        ("FACEBOOK", "🇧🇫 Burkina Faso (1792)", "Burkina"),
         ("FACEBOOK", "🇧🇯 Benin 638 🔥 (450)", "Benin"),
-        ("FB NEW CREATE", "🇮🇹 Italy New FB (520)", "Italy"),
+        ("FACEBOOK", "🇸🇩 Sudan FB 🔥 (874)", "Sudan"),
+        ("FACEBOOK", "🇪🇬 Egypt S1 (9719)", "Egypt"),
+        ("FACEBOOK", "🇲🇲 Myanmar Top (1166)", "Myanmar"),
+        ("FACEBOOK", "🇧🇫 Burkina Faso (1792)", "Burkina"),
         ("FB NEW CREATE", "🇧🇯 Benin 638 🔥 (450)", "Benin"),
+        ("FB NEW CREATE", "🇮🇹 Italy New FB (520)", "Italy"),
         ("TIKTOK", "🇳🇴 Norway TT (2547)", "Norway"),
         ("TIKTOK", "🇳🇵 Nepal TikTok (1752)", "Nepal")
     ]
@@ -134,15 +127,14 @@ get_setting("msg_sel_service", "🚦 **Select a service:** 📥")
 get_setting("msg_sel_country", "🌍 **Select your country:** 📥")
 get_setting("msg_assigned", "📱 **{country} Number Assigned:**\n\n🌟 **Waiting For OTP:**")
 get_setting("msg_support", "🎧 **SUPPORT TEAM**\n\n**If You Need Any Help Message On Support Team**\n\n⏰ **All Time Available**")
-get_setting("msg_traffic", "🟢 **Live Traffic Active!**\n\n1. 🇸🇩 Sudan FB — 37.5%\n2. 🇳🇴 Norway TT — 37.5%\n3. 🇳🇵 Nepal TikTok — 25.0%")
-get_setting("msg_no_number", "⚠️ **দুঃখিত! বর্তমানে {country} দেশের কোনো চালু নাম্বার খালি নেই।**\n\nদয়া করে অন্য কোনো দেশ নির্বাচন করুন অথবা অ্যাডমিনকে নাম্বার লোড করতে বলুন।")
+get_setting("msg_traffic", "🟢 **Live Traffic Active!**\n\n1. 🇧🇯 Benin 638 — 50.0%\n2. 🇸🇩 Sudan FB — 30.0%\n3. 🇳🇴 Norway TT — 20.0%")
+get_setting("msg_no_number", "⚠️ **দুঃখিত! বর্তমানে {country} দেশের কোনো নতুন চালু নাম্বার খালি নেই।**\n\nদয়া করে অন্য কোনো দেশ নির্বাচন করুন অথবা অ্যাডমিনকে নাম্বার লোড করতে বলুন।")
 
 def cancel_markup():
     markup = types.InlineKeyboardMarkup()
     markup.add(types.InlineKeyboardButton("❌ Cancel (বাতিল)", callback_data="cancel_action"))
     return markup
 
-# ১-ক্লিকে কপি হওয়ার জন্য বাটন তৈরির ফাংশন (Native Telegram Copy Text Button)
 def make_copy_btn(num_str):
     num_clean = str(num_str).strip()
     try:
@@ -170,7 +162,6 @@ def update_balance(user_id, amount, otp_inc=0):
     conn.commit()
     return new_bal
 
-# --- ওটিপি আসলে ১ম স্ক্রিনশটের হুবহু ভিআইপি ফরম্যাট ---
 def dispatch_otp_auto(num, code, full_msg=None):
     try:
         clean_num = num.strip().replace(" ", "").replace("-", "")
@@ -178,19 +169,18 @@ def dispatch_otp_auto(num, code, full_msg=None):
         res = cursor.fetchone()
         if res and res[0]:
             target_user = res[0]
-            service_name = res[1] if (len(res) > 1 and res[1]) else "FACEBOOK"
+            service_name = res[1] if res[1] else "FACEBOOK"
             otp_rate = float(get_setting("otp_rate", "0.010"))
             new_bal = update_balance(target_user, otp_rate, otp_inc=1)
             bdt_earned = otp_rate * 120
 
-            # ওটিপি পাওয়ার পর নাম্বার চিরতরে ডেটাবেজ থেকে মুছে ফেলা
+            # ওটিপি পাওয়ার পর ঐ নাম্বার স্থায়ীভাবে ডিলিট
             cursor.execute("DELETE FROM numbers WHERE number LIKE ?", (f"%{clean_num[-8:]}%",))
             conn.commit()
 
             if not full_msg:
                 full_msg = f"<#> {code} est votre code {service_name} H29Q+Fsn4Sr"
 
-            # ১ম স্ক্রিনশটের হুবহু কপি মেসেজ (নম্বর ও ওটিপি কোড ১-ক্লিকেই কপি হবে)
             otp_text = (
                 f"✓ **OTP Received!**\n"
                 f"📲 **Number:** `{clean_num}`\n"
@@ -202,7 +192,7 @@ def dispatch_otp_auto(num, code, full_msg=None):
                 f"```\n\n"
                 f"🛠 **Service:** {service_name}\n"
                 f"📲 **Number:** `{clean_num}`\n"
-                f"💸 **Earned:** ৳0.200"
+                f"💸 **Earned:** ৳{bdt_earned:.3f}"
             )
 
             bot.send_message(target_user, otp_text, parse_mode="Markdown")
@@ -212,7 +202,6 @@ def dispatch_otp_auto(num, code, full_msg=None):
         print(e)
     return False
 
-# --- মেনু ফাংশনসমূহ ---
 def main_menu(user_id):
     b_get = get_setting("btn_get_num", "☎️ Get Number")
     b_cnt = get_setting("btn_avail_cnt", "🌍 Available Country")
@@ -394,7 +383,7 @@ def show_admin_panel(chat_id):
         f"👥 মোট ইউজার: **{total_users} জন**\n"
         f"📬 মোট ওটিপি সম্পন্ন: **{total_otps or 0} টি**\n"
         f"📱 পুলে সচল আসল নাম্বার: **{avail_num} টি**\n\n"
-        f"⚡ *Native 1-Click Copy & Clean UI: সক্রিয় ✅*"
+        f"⚡ *Triple Numbers & Instant Auto-Change Engine Active ✅*"
     )
     bot.send_message(chat_id, admin_text, reply_markup=markup, parse_mode="Markdown")
 
@@ -445,7 +434,7 @@ def process_withdraw(message, balance):
         reply_markup=markup
     )
 
-# --- ইনলাইন বাটন হ্যান্ডলার (ক্লিন লুক ও চেঞ্জ নাম্বার ফিক্স) ---
+# --- ইনলাইন বাটন হ্যান্ডলার (চেঞ্জ নাম্বার ১০০% ফিক্স) ---
 @bot.callback_query_handler(func=lambda call: True)
 def callback_handler(call):
     chat_id = call.message.chat.id
@@ -482,32 +471,36 @@ def callback_handler(call):
             reply_markup=services_menu()
         )
 
-    # 🚀 চেঞ্জ নাম্বার এবং ৩টি নাম্বার দেওয়ার ১০০% ফিক্সড লজিক
+    # 🚀 চেঞ্জ নাম্বার এবং ৩টি নতুন ফ্রেশ নাম্বার দেওয়ার ১০০% ফিক্সড লজিক
     elif call.data.startswith("cnt_"):
         parts = call.data.split("_")
         country_tag, service = parts[1], parts[2]
         bot.answer_callback_query(call.id)
 
         try:
-            # ১. চেঞ্জ নাম্বার চাপলে এই ইউজারের আগের ৩টি নাম্বার পুরোপুরি ডিলিট করা
+            # ১. এই ইউজারের হাতে পূর্বে থাকা ৩টি নাম্বার ডেটাবেজ থেকে পুরোপুরি ভ্যানিশ (ডিলিট) করা
             cursor.execute("DELETE FROM numbers WHERE assigned_user = ?", (chat_id,))
             conn.commit()
 
-            # ২. ডেটাবেজ থেকে পরবর্তী ৩টি ফ্রেশ খালি নাম্বার খোঁজা
-            cursor.execute("SELECT id, number FROM numbers WHERE status = 'AVAILABLE' AND country LIKE ? ORDER BY id ASC LIMIT 3", (f"%{country_tag}%",))
+            # ২. ডেটাবেজ থেকে পরবর্তী ৩টি ফ্রেশ AVAILABLE নাম্বার তোলা
+            cursor.execute(
+                "SELECT id, number FROM numbers WHERE status = 'AVAILABLE' AND (country LIKE ? OR country = ?) ORDER BY id ASC LIMIT 3", 
+                (f"%{country_tag}%", country_tag)
+            )
             rows = cursor.fetchall()
             
             if rows:
                 assigned_numbers = []
                 for num_id, num in rows:
-                    cursor.execute("UPDATE numbers SET status = 'ASSIGNED', assigned_user = ?, assigned_service = ? WHERE id = ?", (chat_id, num_id, service))
+                    # নাম্বারগুলোকে এই ইউজারের জন্য লক করে দেওয়া
+                    cursor.execute("UPDATE numbers SET status = 'ASSIGNED', assigned_user = ? WHERE id = ?", (chat_id, num_id))
                     assigned_numbers.append(num)
                 conn.commit()
 
                 otp_group_link = get_setting("otp_group", "https://t.me/jaazadmin")
                 markup = types.InlineKeyboardMarkup(row_width=1)
 
-                # বাটনে ট্যাপ করলেই নম্বর সরাসরি টেলিগ্রামে কপি হয়ে যাবে (Native 1-Click Copy)
+                # ৩টি আলাদা বাটন (ট্যাপ করলেই সরাসরি ক্লিপবোর্ডে কপি হবে)
                 for num in assigned_numbers:
                     markup.add(make_copy_btn(num))
 
@@ -517,7 +510,7 @@ def callback_handler(call):
                     types.InlineKeyboardButton("📢 OTP Group ↗️", url=otp_group_link)
                 )
 
-                # কোন বাড়তি ডট বা লেখা ছাড়া একদম ফ্রেশ ক্লিন মেসেজ
+                # কোনো বাড়তি লেখা ছাড়া একদম ফ্রেশ ও পরিচ্ছন্ন মেসেজ
                 assigned_tpl = get_setting("msg_assigned", "📱 **{country} Number Assigned:**\n\n🌟 **Waiting For OTP:**")
                 assigned_msg = assigned_tpl.replace("{country}", country_tag)
                 
@@ -609,7 +602,7 @@ def callback_handler(call):
 
     elif call.data == "adm_del_cnt" and chat_id == ADMIN_ID:
         bot.answer_callback_query(call.id)
-        msg = bot.send_message(chat_id, "❌ যে দেশের বাটনটি মুছতে চান তার ট্যাগ লিখুন (যেমন: `Myanmar`):", parse_mode="Markdown", reply_markup=cancel_markup())
+        msg = bot.send_message(chat_id, "❌ যে দেশের বাটনটি মুছতে চান তার ট্যাগ লিখুন (যেমন: `Benin`):", parse_mode="Markdown", reply_markup=cancel_markup())
         bot.register_next_step_handler(msg, do_del_country)
 
     elif call.data == "adm_back_main" and chat_id == ADMIN_ID:
@@ -746,11 +739,13 @@ def do_add_numbers(message):
         return
     try:
         parts = message.text.split()
-        country, number_list = parts[0], parts[1:]
+        country = parts[0]
+        number_list = parts[1:]
         added = 0
         for num in number_list:
+            clean_n = num.strip().replace(" ", "").replace("-", "")
             try:
-                cursor.execute("INSERT INTO numbers (country, number) VALUES (?, ?)", (country, num))
+                cursor.execute("INSERT INTO numbers (country, number) VALUES (?, ?)", (country, clean_n))
                 added += 1
             except:
                 pass
@@ -770,5 +765,5 @@ def do_broadcast(message):
             pass
     bot.send_message(ADMIN_ID, "✅ ব্রডকাস্ট সম্পন্ন!")
 
-print("NEOX FAST SMS [Clean UI & Native 1-Click Copy Engine Active] চালু হয়েছে...")
+print("NEOX FAST SMS [Triple Number & Instant Change Fixed] চালু হয়েছে...")
 bot.infinity_polling()
