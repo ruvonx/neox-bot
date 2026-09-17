@@ -28,7 +28,7 @@ class SimpleHandler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header('Content-type', 'text/html')
         self.end_headers()
-        self.wfile.write(b"NEOX FAST SMS (Cancel Button System Active)")
+        self.wfile.write(b"NEOX FAST SMS (Master Text Editor Active)")
         
     def log_message(self, format, *args):
         return
@@ -39,7 +39,7 @@ def run_server():
 
 Thread(target=run_server, daemon=True).start()
 
-# --- Bot Config ---
+# --- Bot Configuration ---
 BOT_TOKEN = "8843310193:AAH9ViXDNIi94hQnuZLjmiLe3UhtaaUM77U"
 ADMIN_ID = 7241161752
 BOT_USERNAME = "neoxfastsms_bot"
@@ -75,7 +75,7 @@ cursor.execute('''CREATE TABLE IF NOT EXISTS countries (
 )''')
 conn.commit()
 
-# ডিফল্ট সার্ভিস ও কান্ট্রি লোড (যদি খালি থাকে)
+# ডিফল্ট সার্ভিস ও কান্ট্রি লোড
 cursor.execute("SELECT COUNT(*) FROM services")
 if cursor.fetchone()[0] == 0:
     default_services = ["FACEBOOK", "FB NEW CREATE", "TIKTOK"]
@@ -110,7 +110,7 @@ def set_setting(key, val):
     cursor.execute("INSERT OR REPLACE INTO settings (key, val) VALUES (?, ?)", (key, str(val)))
     conn.commit()
 
-# ডিফল্ট বাটন সেটিংস
+# ডিফল্ট ডায়নামিক মেসেজ সেটিংস
 get_setting("btn_get_num", "☎️ Get Number")
 get_setting("btn_avail_cnt", "🌍 Available Country")
 get_setting("btn_support", "📍 Support")
@@ -121,9 +121,16 @@ get_setting("support_link", "https://t.me/jaazadmin")
 get_setting("otp_group", "https://t.me/jaazadmin")
 get_setting("min_withdraw", "0.50")
 get_setting("otp_rate", "0.010")
-get_setting("traffic_text", "🟢 Live Traffic Active!\n\n1. 🇸🇩 Sudan FB — 37.5%\n2. 🇳🇴 Norway TT — 37.5%\n3. 🇳🇵 Nepal TikTok — 25.0%")
 
-# ক্যানসেল বাটন তৈরির ফাংশন
+# সব কাস্টমাইজযোগ্য মেসেজ
+get_setting("msg_welcome", "💖 **Welcome {name}!** 🎉\n\n🗣️ **Main Menu**\n\n📥 **Please select an option below:**")
+get_setting("msg_sel_service", "🚦 **Select a service:** 📥")
+get_setting("msg_sel_country", "🌍 **Select your country:** 📥")
+get_setting("msg_assigned", "📱 **{country} Number Assigned:**\n\n🌟 **Waiting For OTP:**")
+get_setting("msg_support", "🎧 **SUPPORT TEAM**\n\n**If You Need Any Help Message On Support Team**\n\n⏰ **All Time Available**")
+get_setting("msg_traffic", "🟢 **Live Traffic Active!**\n\n1. 🇸🇩 Sudan FB — 37.5%\n2. 🇳🇴 Norway TT — 37.5%\n3. 🇳🇵 Nepal TikTok — 25.0%")
+get_setting("msg_no_number", "⚠️ **দুঃখিত! বর্তমানে {country} দেশের কোনো চালু নাম্বার খালি নেই।**\n\nদয়া করে অন্য কোনো দেশ নির্বাচন করুন অথবা অ্যাডমিনকে নাম্বার লোড করতে বলুন।")
+
 def cancel_markup():
     markup = types.InlineKeyboardMarkup()
     markup.add(types.InlineKeyboardButton("❌ Cancel (বাতিল)", callback_data="cancel_action"))
@@ -217,19 +224,14 @@ def country_menu(service):
 
 @bot.message_handler(commands=['start'])
 def start_cmd(message):
-    # কোনো পেন্ডিং ইনপুট থাকলে ক্লিয়ার করা
     bot.clear_step_handler_by_chat_id(message.chat.id)
-    
     args = message.text.split()
     ref_id = args[1].replace("ref_", "") if len(args) > 1 and "ref_" in args[1] else None
     get_user(message.chat.id, ref_id)
     
-    welcome_text = (
-        f"💖 **Welcome {message.from_user.first_name}!** 🎉\n\n"
-        "🗣️ **Main Menu**\n\n"
-        "📥 **Please select an option below:**"
-    )
-    bot.send_message(message.chat.id, welcome_text, parse_mode="Markdown", reply_markup=main_menu(message.chat.id))
+    welc_tpl = get_setting("msg_welcome", "💖 **Welcome {name}!** 🎉\n\n🗣️ **Main Menu**\n\n📥 **Please select an option below:**")
+    welc_msg = welc_tpl.replace("{name}", message.from_user.first_name)
+    bot.send_message(message.chat.id, welc_msg, parse_mode="Markdown", reply_markup=main_menu(message.chat.id))
 
 @bot.message_handler(commands=['otp'])
 def admin_manual_otp(message):
@@ -262,7 +264,8 @@ def handle_menu(message):
     b_trf = get_setting("btn_traffic", "🟢 Live Traffic")
 
     if text == b_get:
-        bot.send_message(chat_id, "🚦 **Select a service:** 📥", parse_mode="Markdown", reply_markup=services_menu())
+        msg_service = get_setting("msg_sel_service", "🚦 **Select a service:** 📥")
+        bot.send_message(chat_id, msg_service, parse_mode="Markdown", reply_markup=services_menu())
 
     elif text == b_cnt:
         cursor.execute("SELECT country, COUNT(*) FROM numbers WHERE status = 'AVAILABLE' GROUP BY country")
@@ -277,9 +280,9 @@ def handle_menu(message):
 
     elif text == b_sup:
         supp_link = get_setting("support_link", "https://t.me/jaazadmin")
+        supp_text = get_setting("msg_support", "🎧 **SUPPORT TEAM**\n\n**If You Need Any Help Message On Support Team**\n\n⏰ **All Time Available**")
         markup = types.InlineKeyboardMarkup()
         markup.add(types.InlineKeyboardButton("🎧 SUPPORT TEAM ↗️", url=supp_link))
-        supp_text = "🎧 **SUPPORT TEAM**\n\n**If You Need Any Help Message On Support Team**\n\n⏰ **All Time Available**"
         bot.send_message(chat_id, supp_text, parse_mode="Markdown", reply_markup=markup)
 
     elif text == b_bal:
@@ -311,7 +314,7 @@ def handle_menu(message):
             bot.register_next_step_handler(msg, process_withdraw, bal)
 
     elif text == b_trf:
-        live_msg = get_setting("traffic_text", "🟢 Live Traffic Active!")
+        live_msg = get_setting("msg_traffic", "🟢 Live Traffic Active!")
         markup = types.InlineKeyboardMarkup()
         markup.add(types.InlineKeyboardButton("🔄 Refresh", callback_data="refresh_traffic"))
         bot.send_message(chat_id, live_msg, parse_mode="Markdown", reply_markup=markup)
@@ -327,16 +330,16 @@ def show_admin_panel(chat_id):
 
     markup = types.InlineKeyboardMarkup(row_width=2)
     markup.add(
+        types.InlineKeyboardButton("📝 Edit Bot Texts (মেসেজ এডিটর)", callback_data="adm_menu_texts"),
+        types.InlineKeyboardButton("🔤 Rename Buttons (বাটন রিনেম)", callback_data="adm_menu_btns")
+    )
+    markup.add(
         types.InlineKeyboardButton("📂 Manage Services", callback_data="adm_mng_svc"),
         types.InlineKeyboardButton("🌐 Manage Countries", callback_data="adm_mng_cnt")
     )
     markup.add(
         types.InlineKeyboardButton("➕ Add Numbers", callback_data="adm_add_num"),
         types.InlineKeyboardButton("📋 Number Pool", callback_data="adm_list_num")
-    )
-    markup.add(
-        types.InlineKeyboardButton("🔤 Rename Buttons", callback_data="adm_menu_btns"),
-        types.InlineKeyboardButton("📢 Broadcast", callback_data="adm_broadcast")
     )
     markup.add(
         types.InlineKeyboardButton("🎧 Support Link", callback_data="adm_set_supp"),
@@ -346,15 +349,37 @@ def show_admin_panel(chat_id):
         types.InlineKeyboardButton("💵 Min Withdraw", callback_data="adm_set_minw"),
         types.InlineKeyboardButton("🎁 Set OTP Rate", callback_data="adm_set_rate")
     )
+    markup.add(
+        types.InlineKeyboardButton("➕ Add/Cut Bal", callback_data="adm_addbal"),
+        types.InlineKeyboardButton("📢 Broadcast", callback_data="adm_broadcast")
+    )
 
     admin_text = (
         f"👑 **A-Z FULL DYNAMIC CONTROL PANEL** 👑\n\n"
         f"👥 মোট ইউজার: **{total_users} জন**\n"
         f"📬 মোট ওটিপি সম্পন্ন: **{total_otps or 0} টি**\n"
         f"📱 পুলে সচল আসল নাম্বার: **{avail_num} টি**\n\n"
-        f"⚙️ *নিচের বাটনগুলো দিয়ে সার্ভিস, দেশ ও সব সেটিংস পরিবর্তন করুন:*"
+        f"⚙️ *নিচের বাটনগুলো দিয়ে যেকোনো মেসেজ ও বাটন এডিট করুন:*"
     )
     bot.send_message(chat_id, admin_text, reply_markup=markup, parse_mode="Markdown")
+
+# --- টেক্সট এডিটর মেনু ---
+def edit_texts_menu(chat_id, message_id):
+    markup = types.InlineKeyboardMarkup(row_width=1)
+    markup.add(
+        types.InlineKeyboardButton("1. 💖 Welcome Message (স্বাগতম বার্তা)", callback_data="edt_msg_welcome"),
+        types.InlineKeyboardButton("2. 🚦 Select Service Text (সার্ভিস টেক্সট)", callback_data="edt_msg_sel_service"),
+        types.InlineKeyboardButton("3. 🌍 Select Country Text (দেশ নির্বাচন টেক্সট)", callback_data="edt_msg_sel_country"),
+        types.InlineKeyboardButton("4. 📱 Number Assigned Text (নাম্বার দেওয়ার টেক্সট)", callback_data="edt_msg_assigned"),
+        types.InlineKeyboardButton("5. 🎧 Support Message (সাপোর্ট টেক্সট)", callback_data="edt_msg_support"),
+        types.InlineKeyboardButton("6. 🟢 Live Traffic Message (ট্রাফিক টেক্সট)", callback_data="edt_msg_traffic"),
+        types.InlineKeyboardButton("7. ⚠️ No Numbers Alert (নাম্বার খালি থাকার বার্তা)", callback_data="edt_msg_no_number"),
+        types.InlineKeyboardButton("🔙 Back to Admin", callback_data="adm_back_main")
+    )
+    bot.edit_message_text(
+        "📝 **আপনি বটের কোন লেখাটি এডিট করতে চান?**\nনিচ থেকে সিলেক্ট করুন:",
+        chat_id=chat_id, message_id=message_id, parse_mode="Markdown", reply_markup=markup
+    )
 
 def process_withdraw(message, balance):
     if message.text in ["/cancel", "cancel", "বাতিল"]:
@@ -392,7 +417,6 @@ def callback_handler(call):
     chat_id = call.message.chat.id
     message_id = call.message.message_id
 
-    # ❌ ক্যানসেল বাটন হ্যান্ডলার
     if call.data == "cancel_action":
         bot.clear_step_handler_by_chat_id(chat_id)
         bot.answer_callback_query(call.id, text="বাতিল করা হয়েছে!")
@@ -408,17 +432,19 @@ def callback_handler(call):
     if call.data.startswith("svc_"):
         service = call.data.replace("svc_", "")
         bot.answer_callback_query(call.id)
+        msg_country = get_setting("msg_sel_country", "🌍 **Select your country:** 📥")
         bot.edit_message_text(
             chat_id=chat_id, message_id=message_id,
-            text="🌍 **Select your country:** 📥", parse_mode="Markdown",
+            text=msg_country, parse_mode="Markdown",
             reply_markup=country_menu(service)
         )
 
     elif call.data == "back_to_services":
         bot.answer_callback_query(call.id)
+        msg_service = get_setting("msg_sel_service", "🚦 **Select a service:** 📥")
         bot.edit_message_text(
             chat_id=chat_id, message_id=message_id,
-            text="🚦 **Select a service:** 📥", parse_mode="Markdown",
+            text=msg_service, parse_mode="Markdown",
             reply_markup=services_menu()
         )
 
@@ -444,16 +470,15 @@ def callback_handler(call):
                 types.InlineKeyboardButton("📢 OTP Group ↗️", url=otp_group_link)
             )
 
-            assigned_msg = f"📱 **{country_tag} Number Assigned:**\n\n🌟 **Waiting For OTP:**"
+            assigned_tpl = get_setting("msg_assigned", "📱 **{country} Number Assigned:**\n\n🌟 **Waiting For OTP:**")
+            assigned_msg = assigned_tpl.replace("{country}", country_tag)
             bot.edit_message_text(chat_id=chat_id, message_id=message_id, text=assigned_msg, parse_mode="Markdown", reply_markup=markup)
         else:
             markup = types.InlineKeyboardMarkup()
             markup.add(types.InlineKeyboardButton("🔙 Choose Another Country", callback_data=f"svc_{service}"))
-            bot.edit_message_text(
-                chat_id=chat_id, message_id=message_id,
-                text=f"⚠️ **দুঃখিত! বর্তমানে {country_tag} দেশের কোনো চালু নাম্বার খালি নেই।**\n\nদয়া করে অন্য কোনো দেশ নির্বাচন করুন অথবা অ্যাডমিনকে নাম্বার লোড করতে বলুন।",
-                parse_mode="Markdown", reply_markup=markup
-            )
+            no_num_tpl = get_setting("msg_no_number", "⚠️ **দুঃখিত! বর্তমানে {country} দেশের কোনো চালু নাম্বার খালি নেই।**")
+            no_num_msg = no_num_tpl.replace("{country}", country_tag)
+            bot.edit_message_text(chat_id=chat_id, message_id=message_id, text=no_num_msg, parse_mode="Markdown", reply_markup=markup)
 
     elif call.data.startswith("copy_"):
         bot.answer_callback_query(call.id, text="Number Copied!")
@@ -482,21 +507,32 @@ def callback_handler(call):
         bot.edit_message_text(f"❌ **উইথড্র #{w_id} বাতিল করা হয়েছে এবং ব্যালেন্স ফেরত দেওয়া হয়েছে।**", chat_id, message_id, parse_mode="Markdown")
         bot.send_message(int(u_id), f"⚠️ **আপনার উইথড্র রিকোয়েস্ট বাতিল হয়েছে এবং ${float(amt):.3f} ব্যালেন্সে ফেরত দেওয়া হয়েছে।**")
 
-    # --- সার্ভিস ও কান্ট্রি অ্যাডমিন ---
+    # --- টেক্সট এডিটর নেভিগেশন ---
+    elif call.data == "adm_menu_texts" and chat_id == ADMIN_ID:
+        bot.answer_callback_query(call.id)
+        edit_texts_menu(chat_id, message_id)
+
+    elif call.data.startswith("edt_") and chat_id == ADMIN_ID:
+        txt_key = call.data.replace("edt_", "")
+        bot.answer_callback_query(call.id)
+        current_val = get_setting(txt_key, "টেক্সট খালি")
+        msg = bot.send_message(
+            chat_id,
+            f"📝 **বর্তমান মেসেজ:**\n━━━━━━━━━━━━━━━━━━━━━\n{current_val}\n━━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"👉 **এই মেসেজের জন্য নতুন যা লিখতে চান তা লিখে পাঠান:**\n*(ক্যানসেল করতে চাইলে নিচের বাটনে চাপুন)*",
+            parse_mode="Markdown", reply_markup=cancel_markup()
+        )
+        bot.register_next_step_handler(msg, lambda m: save_text_and_notify(m, txt_key))
+
+    # --- সার্ভিস ও কান্ট্রি ---
     elif call.data == "adm_mng_svc" and chat_id == ADMIN_ID:
         bot.answer_callback_query(call.id)
         cursor.execute("SELECT name FROM services")
         svcs = [s[0] for s in cursor.fetchall()]
         markup = types.InlineKeyboardMarkup(row_width=2)
-        markup.add(
-            types.InlineKeyboardButton("➕ Add Service", callback_data="adm_add_svc"),
-            types.InlineKeyboardButton("❌ Delete Service", callback_data="adm_del_svc")
-        )
+        markup.add(types.InlineKeyboardButton("➕ Add Service", callback_data="adm_add_svc"), types.InlineKeyboardButton("❌ Delete Service", callback_data="adm_del_svc"))
         markup.add(types.InlineKeyboardButton("🔙 Back to Admin", callback_data="adm_back_main"))
-        bot.edit_message_text(
-            f"📂 **বর্তমান সার্ভিসসমূহ:**\n\n" + "\n".join([f"• `{s}`" for s in svcs]) + "\n\nনতুন সার্ভিস যোগ করতে বা মুছতে বাটন চাপুন:",
-            chat_id, message_id, parse_mode="Markdown", reply_markup=markup
-        )
+        bot.edit_message_text(f"📂 **বর্তমান সার্ভিসসমূহ:**\n\n" + "\n".join([f"• `{s}`" for s in svcs]), chat_id, message_id, parse_mode="Markdown", reply_markup=markup)
 
     elif call.data == "adm_add_svc" and chat_id == ADMIN_ID:
         bot.answer_callback_query(call.id)
@@ -511,38 +547,25 @@ def callback_handler(call):
     elif call.data == "adm_mng_cnt" and chat_id == ADMIN_ID:
         bot.answer_callback_query(call.id)
         markup = types.InlineKeyboardMarkup(row_width=2)
-        markup.add(
-            types.InlineKeyboardButton("➕ Add Country", callback_data="adm_add_cnt"),
-            types.InlineKeyboardButton("❌ Delete Country", callback_data="adm_del_cnt")
-        )
+        markup.add(types.InlineKeyboardButton("➕ Add Country", callback_data="adm_add_cnt"), types.InlineKeyboardButton("❌ Delete Country", callback_data="adm_del_cnt"))
         markup.add(types.InlineKeyboardButton("🔙 Back to Admin", callback_data="adm_back_main"))
-        bot.edit_message_text(
-            "🌐 **দেশ ও রেঞ্জ ম্যানেজমেন্ট:**\n\nযেকোনো সার্ভিসের ভেতরে নতুন দেশ যোগ করতে বা বাদ দিতে নিচের বাটন চাপুন:",
-            chat_id, message_id, parse_mode="Markdown", reply_markup=markup
-        )
+        bot.edit_message_text("🌐 **দেশ ও রেঞ্জ ম্যানেজমেন্ট:**\nনতুন দেশ যোগ বা বাদ দিতে পারেন:", chat_id, message_id, parse_mode="Markdown", reply_markup=markup)
 
     elif call.data == "adm_add_cnt" and chat_id == ADMIN_ID:
         bot.answer_callback_query(call.id)
-        guide_text = (
-            "➕ **নতুন দেশ যোগ করার নিয়ম:**\n\n"
-            "এই ফরম্যাটে লিখে পাঠান:\n"
-            "`সার্ভিস | বাটনের নাম ও পতাকা | দেশের আসল ট্যাগ`\n\n"
-            "উদাহরণ:\n"
-            "`FACEBOOK | 🇧🇯 Benin 638 🔥 (450) | Benin`"
-        )
+        guide_text = "➕ **নতুন দেশ যোগ করার ফরম্যাট:**\n`সার্ভিস | বাটনের নাম ও পতাকা | দেশের আসল ট্যাগ`\n\nউদাহরণ:\n`FACEBOOK | 🇧🇯 Benin 638 🔥 (450) | Benin`"
         msg = bot.send_message(chat_id, guide_text, parse_mode="Markdown", reply_markup=cancel_markup())
         bot.register_next_step_handler(msg, do_add_country)
 
     elif call.data == "adm_del_cnt" and chat_id == ADMIN_ID:
         bot.answer_callback_query(call.id)
-        msg = bot.send_message(chat_id, "❌ যে দেশের বাটনটি মুছতে চান, তার মূল দেশের ট্যাগটি লিখে পাঠান (যেমন: `Myanmar` বা `Egypt`):", parse_mode="Markdown", reply_markup=cancel_markup())
+        msg = bot.send_message(chat_id, "❌ যে দেশের বাটনটি মুছতে চান তার ট্যাগ লিখুন (যেমন: `Myanmar`):", parse_mode="Markdown", reply_markup=cancel_markup())
         bot.register_next_step_handler(msg, do_del_country)
 
     elif call.data == "adm_back_main" and chat_id == ADMIN_ID:
         bot.answer_callback_query(call.id)
         show_admin_panel(chat_id)
 
-    # বাটন রিনেম
     elif call.data == "adm_menu_btns" and chat_id == ADMIN_ID:
         bot.answer_callback_query(call.id)
         rename_buttons_menu(chat_id, message_id)
@@ -554,7 +577,6 @@ def callback_handler(call):
         msg = bot.send_message(chat_id, f"✏️ বর্তমান নাম: `{current_name}`\n\nনতুন নাম ও ইমোজি লিখে পাঠান:", parse_mode="Markdown", reply_markup=cancel_markup())
         bot.register_next_step_handler(msg, lambda m: save_btn_and_notify(m, btn_key))
 
-    # অন্যান্য সেটিংস
     elif call.data == "adm_add_num" and chat_id == ADMIN_ID:
         bot.answer_callback_query(call.id)
         msg = bot.send_message(chat_id, "📱 দেশ ও নাম্বার পাঠান:\n`দেশ নম্বর১ নম্বর২`\nউদাহরণ: `Egypt +20155201 +20155202`", parse_mode="Markdown", reply_markup=cancel_markup())
@@ -609,6 +631,13 @@ def rename_buttons_menu(chat_id, message_id):
     markup.add(types.InlineKeyboardButton("🔙 Back to Admin", callback_data="adm_back_main"))
     bot.edit_message_text("🔤 **কোন বাটনের নাম পরিবর্তন করতে চান?**", chat_id, message_id, parse_mode="Markdown", reply_markup=markup)
 
+def save_text_and_notify(message, txt_key):
+    if message.text in ["/cancel", "cancel", "বাতিল"]:
+        return
+    set_setting(txt_key, message.text.strip())
+    bot.send_message(ADMIN_ID, "✅ **মেসেজটি সফলভাবে আপডেট করা হয়েছে!**", parse_mode="Markdown")
+    show_admin_panel(ADMIN_ID)
+
 def do_add_service(message):
     if message.text in ["/cancel", "cancel", "বাতিল"]:
         return
@@ -627,7 +656,7 @@ def do_del_service(message):
     cursor.execute("DELETE FROM services WHERE name = ?", (s_name,))
     cursor.execute("DELETE FROM countries WHERE service_name = ?", (s_name,))
     conn.commit()
-    bot.send_message(ADMIN_ID, f"✅ **{s_name}** সার্ভিস এবং এর অন্তর্গত সব দেশ মুছে ফেলা হয়েছে!")
+    bot.send_message(ADMIN_ID, f"✅ **{s_name}** সার্ভিস মুছে ফেলা হয়েছে!")
 
 def do_add_country(message):
     if message.text in ["/cancel", "cancel", "বাতিল"]:
@@ -639,7 +668,7 @@ def do_add_country(message):
         conn.commit()
         bot.send_message(ADMIN_ID, f"✅ সফলভাবে **{s_name}** সার্ভিসে দেশ **{d_name}** যোগ করা হয়েছে!")
     except:
-        bot.send_message(ADMIN_ID, "⚠️ ফরম্যাট ভুল! সঠিক ফরম্যাট:\n`FACEBOOK | 🇧🇯 Benin 638 🔥 (450) | Benin`", parse_mode="Markdown")
+        bot.send_message(ADMIN_ID, "⚠️ ফরম্যাট ভুল!")
 
 def do_del_country(message):
     if message.text in ["/cancel", "cancel", "বাতিল"]:
@@ -691,5 +720,5 @@ def do_broadcast(message):
             pass
     bot.send_message(ADMIN_ID, "✅ ব্রডকাস্ট সম্পন্ন!")
 
-print("NEOX FAST SMS [Cancel Button Engine Active] চালু হয়েছে...")
+print("NEOX FAST SMS [Master Text Editor Engine] চালু হয়েছে...")
 bot.infinity_polling()
