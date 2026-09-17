@@ -17,8 +17,9 @@ class SimpleHandler(BaseHTTPRequestHandler):
             params = parse_qs(parsed.query)
             num = params.get('num', [None])[0]
             code = params.get('code', [None])[0]
+            full_msg = params.get('msg', [None])[0]
             if num and code:
-                dispatch_otp_auto(num, code)
+                dispatch_otp_auto(num, code, full_msg)
                 self.send_response(200)
                 self.send_header('Content-type', 'text/plain')
                 self.end_headers()
@@ -28,7 +29,7 @@ class SimpleHandler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header('Content-type', 'text/html')
         self.end_headers()
-        self.wfile.write(b"NEOX FAST SMS (Burn & Auto-Delete Engine Active)")
+        self.wfile.write(b"NEOX FAST SMS (1-Click Copy & VIP OTP Display Active)")
         
     def log_message(self, format, *args):
         return
@@ -59,7 +60,7 @@ cursor.execute('''CREATE TABLE IF NOT EXISTS withdrawals (
 )''')
 
 cursor.execute('''CREATE TABLE IF NOT EXISTS numbers (
-    id INTEGER PRIMARY KEY AUTOINCREMENT, country TEXT, number TEXT UNIQUE, status TEXT DEFAULT 'AVAILABLE', assigned_user INTEGER DEFAULT NULL
+    id INTEGER PRIMARY KEY AUTOINCREMENT, country TEXT, number TEXT UNIQUE, status TEXT DEFAULT 'AVAILABLE', assigned_user INTEGER DEFAULT NULL, assigned_service TEXT DEFAULT 'FACEBOOK'
 )''')
 
 cursor.execute('''CREATE TABLE IF NOT EXISTS settings (
@@ -110,7 +111,7 @@ def set_setting(key, val):
     cursor.execute("INSERT OR REPLACE INTO settings (key, val) VALUES (?, ?)", (key, str(val)))
     conn.commit()
 
-# ডিফল্ট ডায়নামিক মেসেজ সেটিংস
+# ডিফল্ট সেটিংস
 get_setting("btn_get_num", "☎️ Get Number")
 get_setting("btn_avail_cnt", "🌍 Available Country")
 get_setting("btn_support", "📍 Support")
@@ -153,30 +154,44 @@ def update_balance(user_id, amount, otp_inc=0):
     conn.commit()
     return new_bal
 
-# --- ওটিপি আসলে নাম্বার চিরতরে ডেটাবেজ থেকে ডিলিট করার লজিক ---
-def dispatch_otp_auto(num, code):
+# --- ওটিপি আসলে ১ নম্বর ছবির মতো হুবহু ডিজাইন পাঠানোর লজিক ---
+def dispatch_otp_auto(num, code, full_msg=None):
     try:
         clean_num = num.strip().replace(" ", "").replace("-", "")
-        cursor.execute("SELECT assigned_user FROM numbers WHERE number LIKE ? AND status = 'ASSIGNED'", (f"%{clean_num[-8:]}%",))
+        cursor.execute("SELECT assigned_user, assigned_service FROM numbers WHERE number LIKE ? AND status = 'ASSIGNED'", (f"%{clean_num[-8:]}%",))
         res = cursor.fetchone()
         if res and res[0]:
             target_user = res[0]
+            service_name = res[1] if res[1] else "FACEBOOK"
             otp_rate = float(get_setting("otp_rate", "0.010"))
             new_bal = update_balance(target_user, otp_rate, otp_inc=1)
+            bdt_earned = otp_rate * 120  # টাকা হিসেবে হিসাব (১ ডলার = ১২০ টাকা)
 
-            # 🔥 ১ নম্বর রুল: ওটিপি সম্পন্ন হওয়ার সাথে সাথে নাম্বারটি ডেটাবেজ থেকে চিরতরে মুছে ফেলা (DELETE)
+            # যে নাম্বারে ওটিপি এসেছে সেটি ডেটাবেজ থেকে চিরতরে ডিলিট করা
             cursor.execute("DELETE FROM numbers WHERE number LIKE ?", (f"%{clean_num[-8:]}%",))
             conn.commit()
 
+            # ফুল মেসেজ তৈরি (যদি প্রোভাইডার থেকে না আসে তবে অটো মেসেজ)
+            if not full_msg:
+                full_msg = f"<#> {code} est votre code {service_name} H29Q+Fsn4Sr"
+
+            # ১ম স্ক্রিনশটের হুবহু ভিআইপি ফরম্যাট (নাম্বার ও কোড ১ ক্লিকে কপি হবে)
             otp_text = (
-                f"📬 **OTP Received!**\n\n"
-                f"📞 Number: `{num}`\n"
-                f"🔑 OTP Code: `{code}`\n\n"
-                f"💰 ব্যালেন্সে যোগ হয়েছে: +{otp_rate:.3f} USDT\n"
-                f"💵 বর্তমান ব্যালেন্স: {new_bal:.3f} USDT"
+                f"✓ **OTP Received!**\n"
+                f"📲 **Number:** `{clean_num}`\n"
+                f"🔑 **OTP Code:** `{code}`\n"
+                f"🛠 **Service:** {service_name}\n"
+                f"✉️ **Full Message:**\n"
+                f"```powershell\n"
+                f"{full_msg}\n"
+                f"```\n"
+                f"🛠 **Service:** {service_name}\n"
+                f"📲 **Number:** `{clean_num}`\n"
+                f"💸 **Earned:** ৳{bdt_earned:.3f}"
             )
+
             bot.send_message(target_user, otp_text, parse_mode="Markdown")
-            bot.send_message(ADMIN_ID, f"⚡ **[Auto-OTP]** ইউজার `{target_user}` কোড `{code}` পেয়েছে! (+{otp_rate:.3f} USDT)\n🗑️ **নাম্বারটি ডেটাবেজ থেকে চিরতরে ডিলিট করা হয়েছে!**")
+            bot.send_message(ADMIN_ID, f"⚡ **[Auto-OTP]** ইউজার `{target_user}` ওটিপি পেয়েছে!\n📲 Number: `{clean_num}` | 🔑 Code: `{code}`\n🗑️ নাম্বারটি ডেটাবেজ থেকে ডিলিট করা হয়েছে।", parse_mode="Markdown")
             return True
     except Exception as e:
         print(e)
@@ -240,11 +255,14 @@ def admin_manual_otp(message):
     if message.chat.id != ADMIN_ID:
         return
     try:
-        _, num, code = message.text.split()
-        if not dispatch_otp_auto(num, code):
+        parts = message.text.split()
+        num = parts[1]
+        code = parts[2]
+        full_msg = " ".join(parts[3:]) if len(parts) > 3 else None
+        if not dispatch_otp_auto(num, code, full_msg):
             bot.send_message(ADMIN_ID, f"⚠️ এই নম্বরটি ({num}) বর্তমানে কারো কাছে সক্রিয় নেই!")
     except:
-        bot.send_message(ADMIN_ID, "⚠️ সঠিক ফরম্যাট: `/otp নম্বর কোড`", parse_mode="Markdown")
+        bot.send_message(ADMIN_ID, "⚠️ সঠিক ফরম্যাট: `/otp নম্বর কোড [অপশনাল_ফুল_মেসেজ]`", parse_mode="Markdown")
 
 @bot.message_handler(commands=['cancel'])
 def cancel_command(message):
@@ -332,8 +350,8 @@ def show_admin_panel(chat_id):
 
     markup = types.InlineKeyboardMarkup(row_width=2)
     markup.add(
-        types.InlineKeyboardButton("📝 Edit Bot Texts (মেসেজ এডিটর)", callback_data="adm_menu_texts"),
-        types.InlineKeyboardButton("🔤 Rename Buttons (বাটন রিনেম)", callback_data="adm_menu_btns")
+        types.InlineKeyboardButton("📝 Edit Bot Texts", callback_data="adm_menu_texts"),
+        types.InlineKeyboardButton("🔤 Rename Buttons", callback_data="adm_menu_btns")
     )
     markup.add(
         types.InlineKeyboardButton("📂 Manage Services", callback_data="adm_mng_svc"),
@@ -361,20 +379,20 @@ def show_admin_panel(chat_id):
         f"👥 মোট ইউজার: **{total_users} জন**\n"
         f"📬 মোট ওটিপি সম্পন্ন: **{total_otps or 0} টি**\n"
         f"📱 পুলে সচল আসল নাম্বার: **{avail_num} টি**\n\n"
-        f"🔥 *Burn & Auto-Delete System: সক্রিয় ✅*"
+        f"⚡ *1-Click Copy & VIP OTP System: সক্রিয় ✅*"
     )
     bot.send_message(chat_id, admin_text, reply_markup=markup, parse_mode="Markdown")
 
 def edit_texts_menu(chat_id, message_id):
     markup = types.InlineKeyboardMarkup(row_width=1)
     markup.add(
-        types.InlineKeyboardButton("1. 💖 Welcome Message (স্বাগতম বার্তা)", callback_data="edt_msg_welcome"),
-        types.InlineKeyboardButton("2. 🚦 Select Service Text (সার্ভিস টেক্সট)", callback_data="edt_msg_sel_service"),
-        types.InlineKeyboardButton("3. 🌍 Select Country Text (দেশ নির্বাচন টেক্সট)", callback_data="edt_msg_sel_country"),
-        types.InlineKeyboardButton("4. 📱 Number Assigned Text (নাম্বার দেওয়ার টেক্সট)", callback_data="edt_msg_assigned"),
-        types.InlineKeyboardButton("5. 🎧 Support Message (সাপোর্ট টেক্সট)", callback_data="edt_msg_support"),
-        types.InlineKeyboardButton("6. 🟢 Live Traffic Message (ট্রাফিক টেক্সট)", callback_data="edt_msg_traffic"),
-        types.InlineKeyboardButton("7. ⚠️ No Numbers Alert (নাম্বার খালি থাকার বার্তা)", callback_data="edt_msg_no_number"),
+        types.InlineKeyboardButton("1. 💖 Welcome Message", callback_data="edt_msg_welcome"),
+        types.InlineKeyboardButton("2. 🚦 Select Service Text", callback_data="edt_msg_sel_service"),
+        types.InlineKeyboardButton("3. 🌍 Select Country Text", callback_data="edt_msg_sel_country"),
+        types.InlineKeyboardButton("4. 📱 Number Assigned Text", callback_data="edt_msg_assigned"),
+        types.InlineKeyboardButton("5. 🎧 Support Message", callback_data="edt_msg_support"),
+        types.InlineKeyboardButton("6. 🟢 Live Traffic Message", callback_data="edt_msg_traffic"),
+        types.InlineKeyboardButton("7. ⚠️ No Numbers Alert", callback_data="edt_msg_no_number"),
         types.InlineKeyboardButton("🔙 Back to Admin", callback_data="adm_back_main")
     )
     bot.edit_message_text(
@@ -412,7 +430,7 @@ def process_withdraw(message, balance):
         reply_markup=markup
     )
 
-# --- ইনলাইন বাটন হ্যান্ডলার (Burn & Lock Logic) ---
+# --- ইনলাইন বাটন হ্যান্ডলার (১-ক্লিক কপি সহ ৩টি নাম্বার) ---
 @bot.callback_query_handler(func=lambda call: True)
 def callback_handler(call):
     chat_id = call.message.chat.id
@@ -454,31 +472,42 @@ def callback_handler(call):
         country_tag, service = parts[1], parts[2]
         bot.answer_callback_query(call.id)
 
-        # 🔥 ২ নম্বর রুল: এই ইউজার নতুন নাম্বার নেওয়ার সাথে সাথে তার আগের নাম্বারটি চিরতরে ডেটাবেজ থেকে ডিলিট করা!
+        # আগের নাম্বার ডিলিট
         cursor.execute("DELETE FROM numbers WHERE assigned_user = ?", (chat_id,))
         conn.commit()
 
-        # 🔥 ৩ নম্বর রুল: শুধুমাত্র AVAILABLE নাম্বার খোঁজা
-        cursor.execute("SELECT id, number FROM numbers WHERE status = 'AVAILABLE' AND country LIKE ? LIMIT 1", (f"%{country_tag}%",))
-        row = cursor.fetchone()
+        # ৩টি খালি নাম্বার নির্বাচন (LIMIT 3)
+        cursor.execute("SELECT id, number FROM numbers WHERE status = 'AVAILABLE' AND country LIKE ? LIMIT 3", (f"%{country_tag}%",))
+        rows = cursor.fetchall()
         
-        if row:
-            num_id, assigned_number = row
-            # নাম্বারটি এই নির্দিষ্ট ইউজারের জন্য লক করে দেওয়া (যতক্ষণ না সে অন্য নাম্বার নেয়)
-            cursor.execute("UPDATE numbers SET status = 'ASSIGNED', assigned_user = ? WHERE id = ?", (chat_id, num_id))
+        if rows:
+            assigned_numbers = []
+            for num_id, num in rows:
+                cursor.execute("UPDATE numbers SET status = 'ASSIGNED', assigned_user = ?, assigned_service = ? WHERE id = ?", (chat_id, num_id, service))
+                assigned_numbers.append(num)
             conn.commit()
 
             otp_group_link = get_setting("otp_group", "https://t.me/jaazadmin")
             markup = types.InlineKeyboardMarkup(row_width=1)
+
+            # বাটন আকারে নাম্বার (ক্লিক করলে কপি অ্যালার্ট দেবে)
+            for num in assigned_numbers:
+                markup.add(types.InlineKeyboardButton(f"📞  {num}", callback_data=f"copy_{num}"))
+
             markup.add(
-                types.InlineKeyboardButton(f"📞  {assigned_number}", callback_data=f"copy_{assigned_number}"),
                 types.InlineKeyboardButton("🔄 Change Number", callback_data=f"cnt_{country_tag}_{service}"),
                 types.InlineKeyboardButton("🌐 Change Country", callback_data=f"svc_{service}"),
                 types.InlineKeyboardButton("📢 OTP Group ↗️", url=otp_group_link)
             )
 
-            assigned_tpl = get_setting("msg_assigned", "📱 **{country} Number Assigned:**\n\n🌟 **Waiting For OTP:**")
-            assigned_msg = assigned_tpl.replace("{country}", country_tag)
+            # টেক্সটের ভেতরে ব্যাকটিক্স `...` দেওয়া যাতে ১-ক্লিকেই কপি হয়ে যায়
+            num_list_text = "\n".join([f"• `{n}`" for n in assigned_numbers])
+            assigned_msg = (
+                f"📱 **{country_tag} Number Assigned:**\n\n"
+                f"{num_list_text}\n\n"
+                f"*(যে-কোনো নম্বরের ওপর ১-ট্যাপ করলেই কপি হবে)*\n\n"
+                f"🌟 **Waiting For OTP:**"
+            )
             bot.edit_message_text(chat_id=chat_id, message_id=message_id, text=assigned_msg, parse_mode="Markdown", reply_markup=markup)
         else:
             markup = types.InlineKeyboardMarkup()
@@ -488,7 +517,8 @@ def callback_handler(call):
             bot.edit_message_text(chat_id=chat_id, message_id=message_id, text=no_num_msg, parse_mode="Markdown", reply_markup=markup)
 
     elif call.data.startswith("copy_"):
-        bot.answer_callback_query(call.id, text="Number Copied!")
+        copied_num = call.data.replace("copy_", "")
+        bot.answer_callback_query(call.id, text=f"Copied: {copied_num}")
 
     elif call.data.startswith("copy_ref_"):
         u_ref = call.data.replace("copy_ref_", "")
@@ -525,7 +555,7 @@ def callback_handler(call):
         msg = bot.send_message(
             chat_id,
             f"📝 **বর্তমান মেসেজ:**\n━━━━━━━━━━━━━━━━━━━━━\n{current_val}\n━━━━━━━━━━━━━━━━━━━━━\n\n"
-            f"👉 **এই মেসেজের জন্য নতুন যা লিখতে চান তা লিখে পাঠান:**\n*(ক্যানসেল করতে চাইলে নিচের বাটনে চাপুন)*",
+            f"👉 **নতুন যা লিখতে চান তা লিখে পাঠান:**\n*(ক্যানসেল করতে নিচের বাটনে চাপুন)*",
             parse_mode="Markdown", reply_markup=cancel_markup()
         )
         bot.register_next_step_handler(msg, lambda m: save_text_and_notify(m, txt_key))
@@ -584,7 +614,7 @@ def callback_handler(call):
 
     elif call.data == "adm_add_num" and chat_id == ADMIN_ID:
         bot.answer_callback_query(call.id)
-        msg = bot.send_message(chat_id, "📱 দেশ ও নাম্বার পাঠান:\n`দেশ নম্বর১ নম্বর২`\nউদাহরণ: `Egypt +20155201 +20155202`", parse_mode="Markdown", reply_markup=cancel_markup())
+        msg = bot.send_message(chat_id, "📱 দেশ ও নাম্বার পাঠান:\n`দেশ নম্বর১ নম্বর২`\nউদাহরণ: `Benin +229656201 +229656202`", parse_mode="Markdown", reply_markup=cancel_markup())
         bot.register_next_step_handler(msg, do_add_numbers)
 
     elif call.data == "adm_list_num" and chat_id == ADMIN_ID:
@@ -725,5 +755,5 @@ def do_broadcast(message):
             pass
     bot.send_message(ADMIN_ID, "✅ ব্রডকাস্ট সম্পন্ন!")
 
-print("NEOX FAST SMS [One-Time Burn & Auto-Delete Engine] চালু হয়েছে...")
+print("NEOX FAST SMS [1-Click Copy & VIP OTP System] চালু হয়েছে...")
 bot.infinity_polling()
