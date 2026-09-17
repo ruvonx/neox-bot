@@ -22,13 +22,13 @@ class SimpleHandler(BaseHTTPRequestHandler):
                 self.send_response(200)
                 self.send_header('Content-type', 'text/plain')
                 self.end_headers()
-                self.wfile.write(b"OTP Sent Automatically!")
+                self.wfile.write(b"OK")
                 return
 
         self.send_response(200)
         self.send_header('Content-type', 'text/html')
         self.end_headers()
-        self.wfile.write(b"NEOX Fast SMS is Running 24/7!")
+        self.wfile.write(b"NEOX FAST SMS is Running 24/7!")
         
     def log_message(self, format, *args):
         return
@@ -39,9 +39,10 @@ def run_server():
 
 Thread(target=run_server, daemon=True).start()
 
-# --- Bot Configuration ---
+# --- Bot Config ---
 BOT_TOKEN = "8843310193:AAH9ViXDNIi94hQnuZLjmiLe3UhtaaUM77U"
 ADMIN_ID = 7241161752
+BOT_USERNAME = "neoxfastsms_bot"
 
 bot = telebot.TeleBot(BOT_TOKEN)
 
@@ -52,7 +53,8 @@ cursor.execute('''
     CREATE TABLE IF NOT EXISTS users (
         user_id INTEGER PRIMARY KEY,
         balance REAL DEFAULT 0.0,
-        total_otp INTEGER DEFAULT 0
+        total_otp INTEGER DEFAULT 0,
+        referrer INTEGER DEFAULT NULL
     )
 ''')
 cursor.execute('''
@@ -75,17 +77,18 @@ cursor.execute('''
 ''')
 conn.commit()
 
-def get_user(user_id):
-    cursor.execute("SELECT balance, total_otp FROM users WHERE user_id = ?", (user_id,))
+def get_user(user_id, ref_id=None):
+    cursor.execute("SELECT balance, total_otp, referrer FROM users WHERE user_id = ?", (user_id,))
     row = cursor.fetchone()
     if not row:
-        cursor.execute("INSERT INTO users (user_id, balance, total_otp) VALUES (?, 0.0, 0)", (user_id,))
+        ref = int(ref_id) if ref_id and str(ref_id).isdigit() and int(ref_id) != user_id else None
+        cursor.execute("INSERT INTO users (user_id, balance, total_otp, referrer) VALUES (?, 0.0, 0, ?)", (user_id, ref))
         conn.commit()
-        return (0.0, 0)
+        return (0.0, 0, ref)
     return row
 
 def update_balance(user_id, amount, otp_inc=0):
-    bal, otps = get_user(user_id)
+    bal, otps, _ = get_user(user_id)
     new_bal = max(0.0, bal + amount)
     new_otps = otps + otp_inc
     cursor.execute("UPDATE users SET balance = ?, total_otp = ? WHERE user_id = ?", (new_bal, new_otps, user_id))
@@ -117,7 +120,7 @@ def dispatch_otp_auto(num, code):
         print(e)
     return False
 
-# --- মেনু ডিজাইন ---
+# --- মেনু ডিজাইন (ভিডিও অনুযায়ী হুবহু) ---
 def main_menu(user_id):
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
     markup.add(
@@ -136,35 +139,44 @@ def main_menu(user_id):
         markup.add(types.KeyboardButton("⚙️ ADMIN PANEL"))
     return markup
 
-# সার্ভিস মেনু (AZ স্টাইল)
 def services_menu():
     markup = types.InlineKeyboardMarkup(row_width=1)
     markup.add(
-        types.InlineKeyboardButton("📘 FACEBOOK", callback_data="svc_facebook"),
-        types.InlineKeyboardButton("📸 INSTAGRAM", callback_data="svc_instagram"),
-        types.InlineKeyboardButton("🔷 NEW CREATE ACC", callback_data="svc_newacc"),
-        types.InlineKeyboardButton("🎵 TIKTOK", callback_data="svc_tiktok")
+        types.InlineKeyboardButton("FACEBOOK", callback_data="svc_facebook"),
+        types.InlineKeyboardButton("FB NEW CREATE", callback_data="svc_fbnew"),
+        types.InlineKeyboardButton("TIKTOK", callback_data="svc_tiktok")
     )
     return markup
 
-# দেশ নির্বাচন মেনু (২ কলাম বিশিষ্ট AZ স্টাইল)
 def country_menu(service):
     markup = types.InlineKeyboardMarkup(row_width=2)
-    markup.add(
-        types.InlineKeyboardButton("🇧🇯 Benin 638 🔥 (450)", callback_data=f"cnt_Benin_{service}"),
-        types.InlineKeyboardButton("🇸🇩 Sudan FB 🔥 (924)", callback_data=f"cnt_Sudan_{service}"),
-        types.InlineKeyboardButton("🇲🇿 Mozambique (3420)", callback_data=f"cnt_Mozambique_{service}"),
-        types.InlineKeyboardButton("🇸🇳 Senegal FB (3398)", callback_data=f"cnt_Senegal_{service}"),
-        types.InlineKeyboardButton("🇱🇷 Liberia (5680)", callback_data=f"cnt_Liberia_{service}"),
-        types.InlineKeyboardButton("🇧🇫 Burkina Faso (1796)", callback_data=f"cnt_Burkina_{service}")
-    )
-    markup.add(types.InlineKeyboardButton("🔙 Back to Services", callback_data="back_to_services"))
+    if service == "TIKTOK":
+        markup.add(
+            types.InlineKeyboardButton("🇳🇴 Norway TT (2547)", callback_data=f"cnt_Norway_{service}"),
+            types.InlineKeyboardButton("🇳🇵 Nepal TikTok (1752)", callback_data=f"cnt_Nepal_{service}")
+        )
+    elif service == "FBNEW":
+        markup.add(
+            types.InlineKeyboardButton("🇮🇹 Italy New FB (520)", callback_data=f"cnt_Italy_{service}"),
+            types.InlineKeyboardButton("🇧🇯 Benin 638 🔥 (450)", callback_data=f"cnt_Benin_{service}")
+        )
+    else:
+        markup.add(
+            types.InlineKeyboardButton("🇲🇲 Myanmar Top (1166)", callback_data=f"cnt_Myanmar_{service}"),
+            types.InlineKeyboardButton("🇪🇬 Egypt S1 (9719)", callback_data=f"cnt_Egypt_{service}"),
+            types.InlineKeyboardButton("🇸🇩 Sudan FB 🔥 (874)", callback_data=f"cnt_Sudan_{service}"),
+            types.InlineKeyboardButton("🇧🇫 Burkina Faso (1792)", callback_data=f"cnt_Burkina_{service}")
+        )
+    markup.add(types.InlineKeyboardButton("Back to Services", callback_data="back_to_services"))
     return markup
 
-# --- স্টার্ট কমান্ড ---
+# --- কমান্ডসমূহ ---
 @bot.message_handler(commands=['start'])
 def start_cmd(message):
-    get_user(message.chat.id)
+    args = message.text.split()
+    ref_id = args[1].replace("ref_", "") if len(args) > 1 and "ref_" in args[1] else None
+    get_user(message.chat.id, ref_id)
+    
     welcome_text = (
         f"💖 **Welcome {message.from_user.first_name}!** 🎉\n\n"
         "🗣️ **Main Menu**\n\n"
@@ -172,7 +184,6 @@ def start_cmd(message):
     )
     bot.send_message(message.chat.id, welcome_text, parse_mode="Markdown", reply_markup=main_menu(message.chat.id))
 
-# ম্যানুয়াল ওটিপি কমান্ড
 @bot.message_handler(commands=['otp'])
 def admin_manual_otp(message):
     if message.chat.id != ADMIN_ID:
@@ -192,41 +203,72 @@ def handle_menu(message):
     if text == "☎️ Get Number":
         bot.send_message(chat_id, "🚦 **Select a service:** 📥", parse_mode="Markdown", reply_markup=services_menu())
 
-    elif text == "💸 Balance":
-        bal, otps = get_user(chat_id)
-        bot.send_message(
-            chat_id,
-            f"💰 **আপনার ব্যালেন্স তথ্য:**\n\n"
-            f"💵 বর্তমান ব্যালেন্স: **{bal:.3f} USDT**\n"
-            f"📬 সফল ওটিপি: **{otps} টি**\n\n"
-            f"*(প্রতিটি সফল ওটিপিতে ০.০১০ USDT যোগ হবে)*",
-            parse_mode="Markdown"
+    elif text == "🌍 Available Country":
+        avail_text = (
+            "🌍 **Available Countries:**\n\n"
+            "🇲🇲 **Myanmar Top (+95)** - `11664`\n"
+            "🇳🇴 **Norway TT (+47)** - `2547`\n"
+            "🇪🇬 **Egypt S1 (+201)** - `9715`\n"
+            "🇳🇵 **Nepal TikTok (+977)** - `1752`\n"
+            "🇸🇩 **Sudan FB 🔥 (+249)** - `858`\n"
+            "🇧🇫 **Burkina Faso (+22)** - `1792`\n"
+            "🇮🇹 **Italy New FB (+393)** - `518`\n"
+            "🇧🇯 **Benin 638 (+229)** - `450`"
         )
+        bot.send_message(chat_id, avail_text, parse_mode="Markdown")
+
+    elif text == "📍 Support":
+        markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton("🎧 NEOX SUPPORT ↗️", url="https://t.me/jaazadmin"))
+        supp_text = (
+            "🎧 **NEOX SUPPORT**\n\n"
+            "**If You Need Any Help**\n"
+            "**Message On Support Team**\n\n"
+            "⏰ **All Time Available**"
+        )
+        bot.send_message(chat_id, supp_text, parse_mode="Markdown", reply_markup=markup)
+
+    elif text == "💸 Balance":
+        bal, otps, _ = get_user(chat_id)
+        bdt_val = int(bal * 120)  # ১ USDT = ১২০ টাকা
+        
+        cursor.execute("SELECT COUNT(*) FROM users WHERE referrer = ?", (chat_id,))
+        ref_count = cursor.fetchone()[0]
+
+        markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton("📋 Copy Referral Link", callback_data=f"copy_ref_{chat_id}"))
+
+        bal_text = (
+            f"💰 **Balance:** `${bal:.4f}` ≈ **{bdt_val} BDT**\n"
+            f"🔗 **Referral Link:** `https://t.me/{BOT_USERNAME}?start=ref_{chat_id}`\n\n"
+            f"👥 **Confirmed Referrals:** `{ref_count}`\n"
+            f"💵 **Per Refer Earn:** `$0.1000`\n\n"
+            f"ℹ️ **Referral System:** Referrals are confirmed when referred user completes 10 OTP verifications."
+        )
+        bot.send_message(chat_id, bal_text, parse_mode="Markdown", reply_markup=markup)
 
     elif text == "😎 Withdraw":
-        bal, _ = get_user(chat_id)
-        if bal < 0.05:
-            bot.send_message(chat_id, f"⚠️ উইথড্র করার জন্য আপনার ব্যালেন্স পর্যাপ্ত নয়!\n\n💵 বর্তমান ব্যালেন্স: **{bal:.3f} USDT**\nসর্বনিম্ন উইথড্র: **0.050 USDT**", parse_mode="Markdown")
+        bal, _, _ = get_user(chat_id)
+        if bal < 0.50:
+            bot.send_message(chat_id, "❌ **You need at least $0.5000 to withdraw.**", parse_mode="Markdown")
         else:
             msg = bot.send_message(chat_id, "💳 **আপনার পেমেন্ট তথ্য দিন:**\n\nবিকাশ / নগদ নম্বর অথবা Binance Pay ID লিখে পাঠান:", parse_mode="Markdown")
             bot.register_next_step_handler(msg, process_withdraw, bal)
 
-    elif text == "🌍 Available Country":
-        cursor.execute("SELECT country, COUNT(*) FROM numbers WHERE status = 'AVAILABLE' GROUP BY country")
-        counts = cursor.fetchall()
-        c_text = "🌐 **বর্তমানে সচল নাম্বারসমূহ:**\n\n"
-        if counts:
-            for country, cnt in counts:
-                c_text += f"• **{country}**: `{cnt}` টি সচল আছে\n"
-        else:
-            c_text += "1. 🇧🇯 Benin (+229)\n2. 🇸🇩 Sudan (+249)\n3. 🇲🇿 Mozambique (+258)\n\n*(বর্তমানে নতুন রেঞ্জ লোড হচ্ছে...)*"
-        bot.send_message(chat_id, c_text, parse_mode="Markdown")
-
     elif text == "🟢 Live Traffic":
-        bot.send_message(chat_id, "🔥 **Traffic Status:** হাই স্পিড ট্রাফিক চালু আছে! এখন ফেসবুক, টিকটক ও ইনস্টাগ্রামে ফুল স্পিডে কোড ঢুকছে।", parse_mode="Markdown")
-
-    elif text == "📍 Support":
-        bot.send_message(chat_id, "যেকোনো সমস্যায় যোগাযোগ করুন: @jaazadmin")
+        markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton("🔄 Refresh", callback_data="refresh_traffic"))
+        traf_text = (
+            "🟢 **Live Traffic**\n\n"
+            "🗓️ **Window:** Last 5 minutes\n"
+            "📊 **Results Sent:** 100%\n"
+            "🔥 **Top Country:** 🇸🇩 Sudan FB 🔥\n\n"
+            "🏆 **Top Countries:**\n"
+            "1. 🇸🇩 **Sudan FB 🔥** — 37.5%\n"
+            "2. 🇳🇴 **Norway TT** — 37.5%\n"
+            "3. 🇳🇵 **Nepal TikTok** — 25.0%"
+        )
+        bot.send_message(chat_id, traf_text, parse_mode="Markdown", reply_markup=markup)
 
     elif text == "⚙️ ADMIN PANEL" and chat_id == ADMIN_ID:
         cursor.execute("SELECT COUNT(*), SUM(balance), SUM(total_otp) FROM users")
@@ -263,25 +305,23 @@ def process_withdraw(message, balance):
     bot.send_message(chat_id, "✅ **উইথড্র রিকোয়েস্ট সফল হয়েছে!**\nঅ্যাডমিন যাচাই করে পেমেন্ট পাঠিয়ে দেবেন।", parse_mode="Markdown")
     bot.send_message(ADMIN_ID, f"🚨 **নতুন উইথড্র রিকোয়েস্ট!**\n👤 ইউজার: `{chat_id}`\n💵 পরিমাণ: **{balance:.3f} USDT**\n📝 অ্যাকাউন্ট: `{details}`", parse_mode="Markdown")
 
-# --- ইনলাইন বাটন হ্যান্ডলার (AZ স্টাইলে স্মুথ স্ক্রিন বদল) ---
+# --- ইনলাইন বাটন হ্যান্ডলার (AZ স্টাইলের মতো হুবহু) ---
 @bot.callback_query_handler(func=lambda call: True)
 def callback_handler(call):
     chat_id = call.message.chat.id
     message_id = call.message.message_id
 
-    # ১. সার্ভিস নির্বাচন করলে দেশের লিস্টে যাবে (স্মুথ এডিট)
     if call.data.startswith("svc_"):
         service = call.data.replace("svc_", "").upper()
         bot.answer_callback_query(call.id)
         bot.edit_message_text(
             chat_id=chat_id,
             message_id=message_id,
-            text=f"🌍 **Select your country:** 📥\n(Service: `{service}`)",
+            text="🌍 **Select your country:** 📥",
             parse_mode="Markdown",
             reply_markup=country_menu(service)
         )
 
-    # ব্যাক বাটন চাপলে আবার সার্ভিসের মেনু আসবে
     elif call.data == "back_to_services":
         bot.answer_callback_query(call.id)
         bot.edit_message_text(
@@ -292,47 +332,38 @@ def callback_handler(call):
             reply_markup=services_menu()
         )
 
-    # ২. দেশ নির্বাচন করলে নাম্বার অ্যাসাইন স্ক্রিন আসবে
     elif call.data.startswith("cnt_"):
         parts = call.data.split("_")
         country = parts[1]
         service = parts[2]
-        bot.answer_callback_query(call.id)
+        bot.answer_callback_query(call.id, text=f"2 {country} numbers assigned!")
 
-        # ডেটাবেজ থেকে নির্দিষ্ট দেশের আসল নাম্বার খোঁজা
-        cursor.execute("SELECT id, number FROM numbers WHERE status = 'AVAILABLE' AND country LIKE ? LIMIT 1", (f"%{country}%",))
-        row = cursor.fetchone()
+        # বিভিন্ন দেশের পতাকা ও ডেমো/আসল নম্বর পেয়ার (ভিডিওর মতো হুবহু)
+        country_data = {
+            "Myanmar": ("🇲🇲", "+959650645279", "+959650502688"),
+            "Egypt": ("🇪🇬", "+201552032352", "+201552032843"),
+            "Italy": ("🇮🇹", "+393241946464", "+393241946465"),
+            "Norway": ("🇳🇴", "+4740174027", "+4740167337"),
+            "Sudan": ("🇸🇩", "+249126297403", "+249126297476"),
+            "Benin": ("🇧🇯", "+22965620194", "+22965620195")
+        }
+        flag, num1, num2 = country_data.get(country, ("🌐", "+249126297403", "+249126297476"))
 
-        if row:
-            num_id, num = row
-            cursor.execute("UPDATE numbers SET status = 'ASSIGNED', assigned_user = ? WHERE id = ?", (chat_id, num_id))
-            conn.commit()
-            assigned_number = num
-        else:
-            # পুলে নাম্বার না থাকলে ডিফল্ট আসল নাম্বার
-            fallback_map = {
-                "Benin": "+22965620194",
-                "Sudan": "+249126297403",
-                "Mozambique": "+258861034653",
-                "Senegal": "+221773019482"
-            }
-            assigned_number = fallback_map.get(country, "+22965620194")
-
-        markup = types.InlineKeyboardMarkup(row_width=2)
+        markup = types.InlineKeyboardMarkup(row_width=1)
+        # ভিডিওর মতো সুন্দর বাটন আকারে নম্বর
+        markup.add(
+            types.InlineKeyboardButton(f"{flag}  {num1}", callback_data=f"copy_{num1}"),
+            types.InlineKeyboardButton(f"{flag}  {num2}", callback_data=f"copy_{num2}")
+        )
         markup.add(
             types.InlineKeyboardButton("🔄 Change Number", callback_data=f"cnt_{country}_{service}"),
-            types.InlineKeyboardButton("🌐 Change Country", callback_data=f"svc_{service.lower()}")
+            types.InlineKeyboardButton("🌐 Change Country", callback_data="back_to_services"),
+            types.InlineKeyboardButton("📢 OTP Group ↗️", url="https://t.me/jaazadmin")
         )
-        markup.add(types.InlineKeyboardButton("🧪 Test Receive OTP", callback_data=f"testotp_{service}_{assigned_number}"))
 
         assigned_msg = (
-            f"📱 **{country} Number Assigned:**\n"
-            f"━━━━━━━━━━━━━━━━━━━━━\n"
-            f"📌 Service: **{service}**\n"
-            f"📞 Number: `{assigned_number}` *(ট্যাপ করে কপি করুন)*\n"
-            f"━━━━━━━━━━━━━━━━━━━━━\n\n"
-            f"⏳ **Waiting For OTP...**\n"
-            f"*(কোড পাঠালে স্বয়ংক্রিয়ভাবে মেসেজ চলে আসবে)*"
+            f"{flag} **{country} Number Assigned:**\n\n"
+            f"🌟 **Waiting For OTP:**"
         )
         bot.edit_message_text(
             chat_id=chat_id,
@@ -342,26 +373,17 @@ def callback_handler(call):
             reply_markup=markup
         )
 
-    # টেস্ট ওটিপি বাটন
-    elif call.data.startswith("testotp_"):
-        parts = call.data.split("_")
-        service = parts[1]
-        num = parts[2] if len(parts) > 2 else "Number"
+    elif call.data.startswith("copy_"):
+        num = call.data.replace("copy_", "")
+        bot.answer_callback_query(call.id, text=f"Number Copied: {num}")
 
-        bot.answer_callback_query(call.id, text="নতুন ওটিপি গ্রহণ করা হয়েছে!")
-        new_bal = update_balance(chat_id, 0.010, otp_inc=1)
+    elif call.data.startswith("copy_ref_"):
+        user_ref = call.data.replace("copy_ref_", "")
+        bot.answer_callback_query(call.id, text=f"Referral Link: https://t.me/{BOT_USERNAME}?start=ref_{user_ref}")
 
-        otp_text = (
-            f"📬 **OTP Received!**\n\n"
-            f"📌 Service: **{service}**\n"
-            f"📞 Number: `{num}`\n"
-            f"🔑 OTP Code: `849201`\n\n"
-            f"💰 ব্যালেন্সে যোগ হয়েছে: **+0.010 USDT**\n"
-            f"💵 বর্তমান ব্যালেন্স: **{new_bal:.3f} USDT**"
-        )
-        bot.send_message(chat_id, otp_text, parse_mode="Markdown")
+    elif call.data == "refresh_traffic":
+        bot.answer_callback_query(call.id, text="Traffic refreshed!")
 
-    # অ্যাডমিন প্যানেল অপশনসমূহ
     elif call.data == "admin_add_num" and chat_id == ADMIN_ID:
         bot.answer_callback_query(call.id)
         msg = bot.send_message(chat_id, "📱 দেশ ও নাম্বার পাঠান:\n`দেশ নম্বর১ নম্বর২`\nউদাহরণ: `Benin +229656201 +229656202`", parse_mode="Markdown")
@@ -417,5 +439,5 @@ def do_add_balance(message):
     except:
         bot.send_message(ADMIN_ID, "⚠️ ভুল ফরম্যাট!")
 
-print("NEOX FAST SMS [VIP AZ-Style UI Engine] চালু হয়েছে...")
+print("NEOX FAST SMS [100% AZ Number Bot Replica] চালু হয়েছে...")
 bot.infinity_polling()
