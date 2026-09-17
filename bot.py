@@ -28,7 +28,7 @@ class SimpleHandler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header('Content-type', 'text/html')
         self.end_headers()
-        self.wfile.write(b"NEOX FAST SMS (Master Text Editor Active)")
+        self.wfile.write(b"NEOX FAST SMS (Burn & Auto-Delete Engine Active)")
         
     def log_message(self, format, *args):
         return
@@ -122,7 +122,6 @@ get_setting("otp_group", "https://t.me/jaazadmin")
 get_setting("min_withdraw", "0.50")
 get_setting("otp_rate", "0.010")
 
-# সব কাস্টমাইজযোগ্য মেসেজ
 get_setting("msg_welcome", "💖 **Welcome {name}!** 🎉\n\n🗣️ **Main Menu**\n\n📥 **Please select an option below:**")
 get_setting("msg_sel_service", "🚦 **Select a service:** 📥")
 get_setting("msg_sel_country", "🌍 **Select your country:** 📥")
@@ -154,6 +153,7 @@ def update_balance(user_id, amount, otp_inc=0):
     conn.commit()
     return new_bal
 
+# --- ওটিপি আসলে নাম্বার চিরতরে ডেটাবেজ থেকে ডিলিট করার লজিক ---
 def dispatch_otp_auto(num, code):
     try:
         clean_num = num.strip().replace(" ", "").replace("-", "")
@@ -163,7 +163,9 @@ def dispatch_otp_auto(num, code):
             target_user = res[0]
             otp_rate = float(get_setting("otp_rate", "0.010"))
             new_bal = update_balance(target_user, otp_rate, otp_inc=1)
-            cursor.execute("UPDATE numbers SET status = 'AVAILABLE', assigned_user = NULL WHERE number LIKE ?", (f"%{clean_num[-8:]}%",))
+
+            # 🔥 ১ নম্বর রুল: ওটিপি সম্পন্ন হওয়ার সাথে সাথে নাম্বারটি ডেটাবেজ থেকে চিরতরে মুছে ফেলা (DELETE)
+            cursor.execute("DELETE FROM numbers WHERE number LIKE ?", (f"%{clean_num[-8:]}%",))
             conn.commit()
 
             otp_text = (
@@ -174,7 +176,7 @@ def dispatch_otp_auto(num, code):
                 f"💵 বর্তমান ব্যালেন্স: {new_bal:.3f} USDT"
             )
             bot.send_message(target_user, otp_text, parse_mode="Markdown")
-            bot.send_message(ADMIN_ID, f"⚡ **[Auto-OTP]** ইউজার `{target_user}` কোড `{code}` পেয়েছে! (+{otp_rate:.3f} USDT)")
+            bot.send_message(ADMIN_ID, f"⚡ **[Auto-OTP]** ইউজার `{target_user}` কোড `{code}` পেয়েছে! (+{otp_rate:.3f} USDT)\n🗑️ **নাম্বারটি ডেটাবেজ থেকে চিরতরে ডিলিট করা হয়েছে!**")
             return True
     except Exception as e:
         print(e)
@@ -275,7 +277,7 @@ def handle_menu(message):
             for country, cnt in counts:
                 c_text += f"• **{country}**: `{cnt}` টি নাম্বার সচল আছে\n"
         else:
-            c_text += "বর্তমানে পুলে নতুন নাম্বার লোড করা হচ্ছে..."
+            c_text += "বর্তমানে পুলে কোনো নাম্বার খালি নেই।"
         bot.send_message(chat_id, c_text, parse_mode="Markdown")
 
     elif text == b_sup:
@@ -359,11 +361,10 @@ def show_admin_panel(chat_id):
         f"👥 মোট ইউজার: **{total_users} জন**\n"
         f"📬 মোট ওটিপি সম্পন্ন: **{total_otps or 0} টি**\n"
         f"📱 পুলে সচল আসল নাম্বার: **{avail_num} টি**\n\n"
-        f"⚙️ *নিচের বাটনগুলো দিয়ে যেকোনো মেসেজ ও বাটন এডিট করুন:*"
+        f"🔥 *Burn & Auto-Delete System: সক্রিয় ✅*"
     )
     bot.send_message(chat_id, admin_text, reply_markup=markup, parse_mode="Markdown")
 
-# --- টেক্সট এডিটর মেনু ---
 def edit_texts_menu(chat_id, message_id):
     markup = types.InlineKeyboardMarkup(row_width=1)
     markup.add(
@@ -411,7 +412,7 @@ def process_withdraw(message, balance):
         reply_markup=markup
     )
 
-# --- ইনলাইন বাটন হ্যান্ডলার ---
+# --- ইনলাইন বাটন হ্যান্ডলার (Burn & Lock Logic) ---
 @bot.callback_query_handler(func=lambda call: True)
 def callback_handler(call):
     chat_id = call.message.chat.id
@@ -453,11 +454,17 @@ def callback_handler(call):
         country_tag, service = parts[1], parts[2]
         bot.answer_callback_query(call.id)
 
+        # 🔥 ২ নম্বর রুল: এই ইউজার নতুন নাম্বার নেওয়ার সাথে সাথে তার আগের নাম্বারটি চিরতরে ডেটাবেজ থেকে ডিলিট করা!
+        cursor.execute("DELETE FROM numbers WHERE assigned_user = ?", (chat_id,))
+        conn.commit()
+
+        # 🔥 ৩ নম্বর রুল: শুধুমাত্র AVAILABLE নাম্বার খোঁজা
         cursor.execute("SELECT id, number FROM numbers WHERE status = 'AVAILABLE' AND country LIKE ? LIMIT 1", (f"%{country_tag}%",))
         row = cursor.fetchone()
         
         if row:
             num_id, assigned_number = row
+            # নাম্বারটি এই নির্দিষ্ট ইউজারের জন্য লক করে দেওয়া (যতক্ষণ না সে অন্য নাম্বার নেয়)
             cursor.execute("UPDATE numbers SET status = 'ASSIGNED', assigned_user = ? WHERE id = ?", (chat_id, num_id))
             conn.commit()
 
@@ -507,7 +514,6 @@ def callback_handler(call):
         bot.edit_message_text(f"❌ **উইথড্র #{w_id} বাতিল করা হয়েছে এবং ব্যালেন্স ফেরত দেওয়া হয়েছে।**", chat_id, message_id, parse_mode="Markdown")
         bot.send_message(int(u_id), f"⚠️ **আপনার উইথড্র রিকোয়েস্ট বাতিল হয়েছে এবং ${float(amt):.3f} ব্যালেন্সে ফেরত দেওয়া হয়েছে।**")
 
-    # --- টেক্সট এডিটর নেভিগেশন ---
     elif call.data == "adm_menu_texts" and chat_id == ADMIN_ID:
         bot.answer_callback_query(call.id)
         edit_texts_menu(chat_id, message_id)
@@ -524,7 +530,6 @@ def callback_handler(call):
         )
         bot.register_next_step_handler(msg, lambda m: save_text_and_notify(m, txt_key))
 
-    # --- সার্ভিস ও কান্ট্রি ---
     elif call.data == "adm_mng_svc" and chat_id == ADMIN_ID:
         bot.answer_callback_query(call.id)
         cursor.execute("SELECT name FROM services")
@@ -720,5 +725,5 @@ def do_broadcast(message):
             pass
     bot.send_message(ADMIN_ID, "✅ ব্রডকাস্ট সম্পন্ন!")
 
-print("NEOX FAST SMS [Master Text Editor Engine] চালু হয়েছে...")
+print("NEOX FAST SMS [One-Time Burn & Auto-Delete Engine] চালু হয়েছে...")
 bot.infinity_polling()
