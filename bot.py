@@ -28,7 +28,7 @@ class SimpleHandler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header('Content-type', 'text/html')
         self.end_headers()
-        self.wfile.write(b"NEOX FAST SMS (A-Z Admin Control Active)")
+        self.wfile.write(b"NEOX FAST SMS (Full Dynamic Control Active)")
         
     def log_message(self, format, *args):
         return
@@ -49,7 +49,7 @@ bot = telebot.TeleBot(BOT_TOKEN)
 conn = sqlite3.connect("bot_users.db", check_same_thread=False)
 cursor = conn.cursor()
 
-# ইউজার, উইথড্র ও নাম্বারের টেবিল
+# টেবিলসমূহ
 cursor.execute('''CREATE TABLE IF NOT EXISTS users (
     user_id INTEGER PRIMARY KEY, balance REAL DEFAULT 0.0, total_otp INTEGER DEFAULT 0, referrer INTEGER DEFAULT NULL
 )''')
@@ -62,13 +62,12 @@ cursor.execute('''CREATE TABLE IF NOT EXISTS numbers (
     id INTEGER PRIMARY KEY AUTOINCREMENT, country TEXT, number TEXT UNIQUE, status TEXT DEFAULT 'AVAILABLE', assigned_user INTEGER DEFAULT NULL
 )''')
 
-# A to Z সেটিংস টেবিল (টেলিগ্রাম থেকে নিয়ন্ত্রণের জন্য)
 cursor.execute('''CREATE TABLE IF NOT EXISTS settings (
     key TEXT PRIMARY KEY, val TEXT
 )''')
 conn.commit()
 
-# ডিফল্ট সেটিংস লোডার
+# সেটিংস ফাংশন
 def get_setting(key, default_val):
     cursor.execute("SELECT val FROM settings WHERE key = ?", (key,))
     row = cursor.fetchone()
@@ -82,12 +81,19 @@ def set_setting(key, val):
     cursor.execute("INSERT OR REPLACE INTO settings (key, val) VALUES (?, ?)", (key, str(val)))
     conn.commit()
 
-# প্রাথমিক সেটিংস মান
+# ডিফল্ট ডায়নামিক বাটন নামসমূহ
+get_setting("btn_get_num", "☎️ Get Number")
+get_setting("btn_avail_cnt", "🌍 Available Country")
+get_setting("btn_support", "📍 Support")
+get_setting("btn_balance", "💸 Balance")
+get_setting("btn_withdraw", "😎 Withdraw")
+get_setting("btn_traffic", "🟢 Live Traffic")
 get_setting("support_link", "https://t.me/jaazadmin")
 get_setting("otp_group", "https://t.me/jaazadmin")
 get_setting("min_withdraw", "0.50")
 get_setting("otp_rate", "0.010")
 get_setting("traffic_text", "🟢 Live Traffic\n\n🗓️ Window: Last 5 minutes\n📊 Results Sent: 100%\n🔥 Top Country: 🇸🇩 Sudan FB 🔥\n\n1. 🇸🇩 Sudan FB — 37.5%\n2. 🇳🇴 Norway TT — 37.5%\n3. 🇳🇵 Nepal TikTok — 25.0%")
+get_setting("welcome_text", "💖 Welcome {name}! 🎉\n\n🗣️ Main Menu\n\n📥 Please select an option below:")
 
 def get_user(user_id, ref_id=None):
     cursor.execute("SELECT balance, total_otp, referrer FROM users WHERE user_id = ?", (user_id,))
@@ -133,21 +139,19 @@ def dispatch_otp_auto(num, code):
         print(e)
     return False
 
-# --- মেনু লেআউট ---
+# --- ১০০% ডায়নামিক মেনু (টেলিগ্রাম থেকে নাম পরিবর্তন করা যায়) ---
 def main_menu(user_id):
+    b_get = get_setting("btn_get_num", "☎️ Get Number")
+    b_cnt = get_setting("btn_avail_cnt", "🌍 Available Country")
+    b_sup = get_setting("btn_support", "📍 Support")
+    b_bal = get_setting("btn_balance", "💸 Balance")
+    b_wit = get_setting("btn_withdraw", "😎 Withdraw")
+    b_trf = get_setting("btn_traffic", "🟢 Live Traffic")
+
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
-    markup.add(
-        types.KeyboardButton("☎️ Get Number"),
-        types.KeyboardButton("🌍 Available Country")
-    )
-    markup.add(
-        types.KeyboardButton("📍 Support"),
-        types.KeyboardButton("💸 Balance")
-    )
-    markup.add(
-        types.KeyboardButton("😎 Withdraw"),
-        types.KeyboardButton("🟢 Live Traffic")
-    )
+    markup.add(types.KeyboardButton(b_get), types.KeyboardButton(b_cnt))
+    markup.add(types.KeyboardButton(b_sup), types.KeyboardButton(b_bal))
+    markup.add(types.KeyboardButton(b_wit), types.KeyboardButton(b_trf))
     if user_id == ADMIN_ID:
         markup.add(types.KeyboardButton("⚙️ ADMIN PANEL"))
     return markup
@@ -190,12 +194,9 @@ def start_cmd(message):
     ref_id = args[1].replace("ref_", "") if len(args) > 1 and "ref_" in args[1] else None
     get_user(message.chat.id, ref_id)
     
-    welcome_text = (
-        f"💖 **Welcome {message.from_user.first_name}!** 🎉\n\n"
-        "🗣️ **Main Menu**\n\n"
-        "📥 **Please select an option below:**"
-    )
-    bot.send_message(message.chat.id, welcome_text, parse_mode="Markdown", reply_markup=main_menu(message.chat.id))
+    welc_tpl = get_setting("welcome_text", "💖 Welcome {name}! 🎉\n\n🗣️ Main Menu\n\n📥 Please select an option below:")
+    welc_msg = welc_tpl.replace("{name}", message.from_user.first_name)
+    bot.send_message(message.chat.id, welc_msg, reply_markup=main_menu(message.chat.id))
 
 @bot.message_handler(commands=['otp'])
 def admin_manual_otp(message):
@@ -206,17 +207,25 @@ def admin_manual_otp(message):
         if not dispatch_otp_auto(num, code):
             bot.send_message(ADMIN_ID, f"⚠️ এই নম্বরটি ({num}) বর্তমানে কারো কাছে সক্রিয় নেই!")
     except:
-        bot.send_message(ADMIN_ID, "⚠️ সঠিক ফরম্যাট: `/otp নম্বর কোড`", parse_mode="Markdown")
+        bot.send_message(ADMIN_ID, "⚠️ ফরম্যাট: `/otp নম্বর কোড`", parse_mode="Markdown")
 
+# --- ডায়নামিক মেসেজ হ্যান্ডলার ---
 @bot.message_handler(func=lambda msg: True)
 def handle_menu(message):
     chat_id = message.chat.id
     text = message.text
 
-    if text == "☎️ Get Number":
+    b_get = get_setting("btn_get_num", "☎️ Get Number")
+    b_cnt = get_setting("btn_avail_cnt", "🌍 Available Country")
+    b_sup = get_setting("btn_support", "📍 Support")
+    b_bal = get_setting("btn_balance", "💸 Balance")
+    b_wit = get_setting("btn_withdraw", "😎 Withdraw")
+    b_trf = get_setting("btn_traffic", "🟢 Live Traffic")
+
+    if text == b_get:
         bot.send_message(chat_id, "🚦 **Select a service:** 📥", parse_mode="Markdown", reply_markup=services_menu())
 
-    elif text == "🌍 Available Country":
+    elif text == b_cnt:
         avail_text = (
             "🌍 **Available Countries:**\n\n"
             "🇲🇲 **Myanmar Top (+95)** - `11664`\n"
@@ -230,19 +239,14 @@ def handle_menu(message):
         )
         bot.send_message(chat_id, avail_text, parse_mode="Markdown")
 
-    elif text == "📍 Support":
+    elif text == b_sup:
         supp_link = get_setting("support_link", "https://t.me/jaazadmin")
         markup = types.InlineKeyboardMarkup()
         markup.add(types.InlineKeyboardButton("🎧 SUPPORT TEAM ↗️", url=supp_link))
-        supp_text = (
-            "🎧 **SUPPORT TEAM**\n\n"
-            "**If You Need Any Help**\n"
-            "**Message On Support Team**\n\n"
-            "⏰ **All Time Available**"
-        )
+        supp_text = "🎧 **SUPPORT TEAM**\n\n**If You Need Any Help Message On Support Team**\n\n⏰ **All Time Available**"
         bot.send_message(chat_id, supp_text, parse_mode="Markdown", reply_markup=markup)
 
-    elif text == "💸 Balance":
+    elif text == b_bal:
         bal, otps, _ = get_user(chat_id)
         bdt_val = int(bal * 120)
         otp_rate = float(get_setting("otp_rate", "0.010"))
@@ -263,7 +267,7 @@ def handle_menu(message):
         )
         bot.send_message(chat_id, bal_text, parse_mode="Markdown", reply_markup=markup)
 
-    elif text == "😎 Withdraw":
+    elif text == b_wit:
         bal, _, _ = get_user(chat_id)
         min_w = float(get_setting("min_withdraw", "0.50"))
         if bal < min_w:
@@ -272,16 +276,16 @@ def handle_menu(message):
             msg = bot.send_message(chat_id, "💳 **আপনার পেমেন্ট তথ্য দিন:**\n\nবিকাশ / নগদ নম্বর অথবা Binance Pay ID লিখে পাঠান:", parse_mode="Markdown")
             bot.register_next_step_handler(msg, process_withdraw, bal)
 
-    elif text == "🟢 Live Traffic":
+    elif text == b_trf:
         live_msg = get_setting("traffic_text", "🟢 Live Traffic Active!")
         markup = types.InlineKeyboardMarkup()
         markup.add(types.InlineKeyboardButton("🔄 Refresh", callback_data="refresh_traffic"))
         bot.send_message(chat_id, live_msg, parse_mode="Markdown", reply_markup=markup)
 
-    # --- এ টু জেড অ্যাডমিন কন্ট্রোল প্যানেল ---
     elif text == "⚙️ ADMIN PANEL" and chat_id == ADMIN_ID:
         show_admin_panel(chat_id)
 
+# --- সুপার কন্ট্রোল অ্যাডমিন প্যানেল ---
 def show_admin_panel(chat_id):
     cursor.execute("SELECT COUNT(*), SUM(balance), SUM(total_otp) FROM users")
     total_users, total_bal, total_otps = cursor.fetchone()
@@ -301,26 +305,55 @@ def show_admin_panel(chat_id):
         types.InlineKeyboardButton("📢 Broadcast", callback_data="adm_broadcast")
     )
     markup.add(
-        types.InlineKeyboardButton("🎧 Set Support Link", callback_data="adm_set_supp"),
-        types.InlineKeyboardButton("📢 Set OTP Group", callback_data="adm_set_group")
+        types.InlineKeyboardButton("🔤 Rename Buttons (বাটন নাম)", callback_data="adm_menu_btns"),
+        types.InlineKeyboardButton("✏️ Set Welcome Msg", callback_data="adm_set_welc")
     )
     markup.add(
-        types.InlineKeyboardButton("💵 Set Min Withdraw", callback_data="adm_set_minw"),
+        types.InlineKeyboardButton("🎧 Support Link", callback_data="adm_set_supp"),
+        types.InlineKeyboardButton("📢 OTP Group Link", callback_data="adm_set_group")
+    )
+    markup.add(
+        types.InlineKeyboardButton("💵 Min Withdraw", callback_data="adm_set_minw"),
         types.InlineKeyboardButton("🎁 Set OTP Rate", callback_data="adm_set_rate")
     )
     markup.add(
-        types.InlineKeyboardButton("🟢 Set Traffic Text", callback_data="adm_set_traf")
+        types.InlineKeyboardButton("🟢 Traffic Message", callback_data="adm_set_traf")
     )
 
     admin_text = (
-        f"👑 **A-Z ADMIN CONTROL PANEL** 👑\n\n"
+        f"👑 **A-Z FULL CONTROL ADMIN PANEL** 👑\n\n"
         f"👥 মোট ইউজার: **{total_users} জন**\n"
         f"📬 মোট ওটিপি সম্পন্ন: **{total_otps or 0} টি**\n"
         f"📱 পুলে সচল আসল নাম্বার: **{avail_num} টি**\n"
         f"💵 মিনিমাম উইথড্র: **${min_w}** | প্রতি ওটিপি: **${rate}**\n\n"
-        f"⚙️ *নিচের বাটনগুলো দিয়ে যেকোনো সেটিংস পরিবর্তন করুন:*"
+        f"⚙️ *যেকোনো বাটন বা সেটিংস বদলাতে নিচের বাটনে চাপ দিন:*"
     )
     bot.send_message(chat_id, admin_text, reply_markup=markup, parse_mode="Markdown")
+
+# বাটন নাম পরিবর্তনের সাব-মেনু
+def rename_buttons_menu(chat_id, message_id):
+    markup = types.InlineKeyboardMarkup(row_width=2)
+    markup.add(
+        types.InlineKeyboardButton("1. Get Number বাটন", callback_data="rnb_btn_get_num"),
+        types.InlineKeyboardButton("2. Available Country বাটন", callback_data="rnb_btn_avail_cnt")
+    )
+    markup.add(
+        types.InlineKeyboardButton("3. Support বাটন", callback_data="rnb_btn_support"),
+        types.InlineKeyboardButton("4. Balance বাটন", callback_data="rnb_btn_balance")
+    )
+    markup.add(
+        types.InlineKeyboardButton("5. Withdraw বাটন", callback_data="rnb_btn_withdraw"),
+        types.InlineKeyboardButton("6. Live Traffic বাটন", callback_data="rnb_btn_traffic")
+    )
+    markup.add(types.InlineKeyboardButton("🔙 Back to Admin", callback_data="adm_back_main"))
+
+    bot.edit_message_text(
+        "🔤 **কোন বাটনের নাম ও ইমোজি পরিবর্তন করতে চান?**\nনিচ থেকে বাটনটি বেছে নিন:",
+        chat_id=chat_id,
+        message_id=message_id,
+        parse_mode="Markdown",
+        reply_markup=markup
+    )
 
 def process_withdraw(message, balance):
     chat_id = message.chat.id
@@ -349,7 +382,6 @@ def process_withdraw(message, balance):
         reply_markup=markup
     )
 
-# --- ইনলাইন বাটন হ্যান্ডলার ---
 @bot.callback_query_handler(func=lambda call: True)
 def callback_handler(call):
     chat_id = call.message.chat.id
@@ -395,3 +427,160 @@ def callback_handler(call):
             types.InlineKeyboardButton("🔄 Change Number", callback_data=f"cnt_{country}_{service}"),
             types.InlineKeyboardButton("🌐 Change Country", callback_data="back_to_services"),
             types.InlineKeyboardButton("📢 OTP Group ↗️", url=otp_group_link)
+        )
+
+        assigned_msg = f"📱 **{country} Number Assigned:**\n\n🌟 **Waiting For OTP:**"
+        bot.edit_message_text(chat_id=chat_id, message_id=message_id, text=assigned_msg, parse_mode="Markdown", reply_markup=markup)
+
+    elif call.data.startswith("copy_"):
+        bot.answer_callback_query(call.id, text="Number Copied!")
+
+    elif call.data.startswith("copy_ref_"):
+        u_ref = call.data.replace("copy_ref_", "")
+        bot.answer_callback_query(call.id, text=f"Referral Link: https://t.me/{BOT_USERNAME}?start=ref_{u_ref}")
+
+    elif call.data == "refresh_traffic":
+        bot.answer_callback_query(call.id, text="Traffic refreshed!")
+
+    # উইথড্র অ্যাপ্রুভ / রিজেক্ট
+    elif call.data.startswith("wapp_") and chat_id == ADMIN_ID:
+        _, w_id, u_id, amt = call.data.split("_")
+        cursor.execute("UPDATE withdrawals SET status = 'APPROVED' WHERE id = ?", (w_id,))
+        conn.commit()
+        bot.answer_callback_query(call.id, text="উইথড্র অ্যাপ্রুভ হয়েছে!")
+        bot.edit_message_text(f"✅ **উইথড্র #{w_id} অ্যাপ্রুভ করা হয়েছে!**\nটাকা পাঠিয়ে দেওয়া হয়েছে।", chat_id, message_id, parse_mode="Markdown")
+        bot.send_message(int(u_id), f"🎉 **আপনার ${float(amt):.3f} উইথড্র সফলভাবে পরিশোধ করা হয়েছে!**")
+
+    elif call.data.startswith("wrej_") and chat_id == ADMIN_ID:
+        _, w_id, u_id, amt = call.data.split("_")
+        cursor.execute("UPDATE withdrawals SET status = 'REJECTED' WHERE id = ?", (w_id,))
+        conn.commit()
+        update_balance(int(u_id), float(amt))
+        bot.answer_callback_query(call.id, text="উইথড্র বাতিল হয়েছে!")
+        bot.edit_message_text(f"❌ **উইথড্র #{w_id} বাতিল করা হয়েছে এবং ব্যালেন্স ফেরত দেওয়া হয়েছে।**", chat_id, message_id, parse_mode="Markdown")
+        bot.send_message(int(u_id), f"⚠️ **আপনার উইথড্র রিকোয়েস্ট বাতিল হয়েছে এবং ${float(amt):.3f} ব্যালেন্সে ফেরত দেওয়া হয়েছে।**")
+
+    # বাটন নাম পরিবর্তন সাব-মেনু
+    elif call.data == "adm_menu_btns" and chat_id == ADMIN_ID:
+        bot.answer_callback_query(call.id)
+        rename_buttons_menu(chat_id, message_id)
+
+    elif call.data == "adm_back_main" and chat_id == ADMIN_ID:
+        bot.answer_callback_query(call.id)
+        show_admin_panel(chat_id)
+
+    elif call.data.startswith("rnb_") and chat_id == ADMIN_ID:
+        btn_key = call.data.replace("rnb_", "")
+        bot.answer_callback_query(call.id)
+        current_name = get_setting(btn_key, "Button")
+        msg = bot.send_message(
+            chat_id, 
+            f"✏️ বর্তমান নাম: `{current_name}`\n\n"
+            f"এই বাটনের জন্য **নতুন নাম এবং ইমোজি** লিখে পাঠান:\n(যেমন: `📱 নম্বর নিন` বা `⚡ Fast OTP`)",
+            parse_mode="Markdown"
+        )
+        bot.register_next_step_handler(msg, lambda m: save_btn_and_notify(m, btn_key))
+
+    # অ্যাডমিন প্যানেলের সেটিংস
+    elif call.data == "adm_add_num" and chat_id == ADMIN_ID:
+        bot.answer_callback_query(call.id)
+        msg = bot.send_message(chat_id, "📱 দেশ ও নাম্বার পাঠান:\n`দেশ নম্বর১ নম্বর২`\nউদাহরণ: `Sudan +249111 +249222`", parse_mode="Markdown")
+        bot.register_next_step_handler(msg, do_add_numbers)
+
+    elif call.data == "adm_list_num" and chat_id == ADMIN_ID:
+        bot.answer_callback_query(call.id)
+        cursor.execute("SELECT country, number, status FROM numbers LIMIT 15")
+        nums = cursor.fetchall()
+        list_text = "📋 বটের নাম্বার লিস্ট:\n\n" + "\n".join([f"• `{n}` ({c}) - {s}" for c, n, s in nums]) if nums else "কোনো নাম্বার নেই।"
+        bot.send_message(chat_id, list_text, parse_mode="Markdown")
+
+    elif call.data == "adm_broadcast" and chat_id == ADMIN_ID:
+        bot.answer_callback_query(call.id)
+        msg = bot.send_message(chat_id, "📢 সকল ইউজারকে পাঠানোর জন্য মেসেজটি লিখুন:")
+        bot.register_next_step_handler(msg, do_broadcast)
+
+    elif call.data == "adm_addbal" and chat_id == ADMIN_ID:
+        bot.answer_callback_query(call.id)
+        msg = bot.send_message(chat_id, "ফরম্যাট: `আইডি ব্যালেন্স` (যেমন: 7241161752 0.50)")
+        bot.register_next_step_handler(msg, do_add_balance)
+
+    elif call.data == "adm_set_supp" and chat_id == ADMIN_ID:
+        bot.answer_callback_query(call.id)
+        msg = bot.send_message(chat_id, "🎧 নতুন সাপোর্ট টেলিগ্রাম লিংক পাঠান:\n(যেমন: `https://t.me/jaazadmin`)", parse_mode="Markdown")
+        bot.register_next_step_handler(msg, lambda m: save_setting_and_notify(m, "support_link", "সাপোর্ট লিংক"))
+
+    elif call.data == "adm_set_group" and chat_id == ADMIN_ID:
+        bot.answer_callback_query(call.id)
+        msg = bot.send_message(chat_id, "📢 নতুন OTP Group লিংক পাঠান:\n(যেমন: `https://t.me/YourGroup`)", parse_mode="Markdown")
+        bot.register_next_step_handler(msg, lambda m: save_setting_and_notify(m, "otp_group", "OTP Group লিংক"))
+
+    elif call.data == "adm_set_minw" and chat_id == ADMIN_ID:
+        bot.answer_callback_query(call.id)
+        msg = bot.send_message(chat_id, "💵 নতুন মিনিমাম উইথড্র অ্যামাউন্ট লিখুন (ডলারে):\n(যেমন: `0.50` বা `1.00`)", parse_mode="Markdown")
+        bot.register_next_step_handler(msg, lambda m: save_setting_and_notify(m, "min_withdraw", "মিনিমাম উইথড্র লিমিট"))
+
+    elif call.data == "adm_set_rate" and chat_id == ADMIN_ID:
+        bot.answer_callback_query(call.id)
+        msg = bot.send_message(chat_id, "🎁 প্রতি ওটিপির রেট লিখুন (ডলারে):\n(যেমন: `0.010` বা `0.015`)", parse_mode="Markdown")
+        bot.register_next_step_handler(msg, lambda m: save_setting_and_notify(m, "otp_rate", "প্রতি ওটিপির রেট"))
+
+    elif call.data == "adm_set_traf" and chat_id == ADMIN_ID:
+        bot.answer_callback_query(call.id)
+        msg = bot.send_message(chat_id, "🟢 লাইভ ট্রাফিকের জন্য পুরো মেসেজটি লিখে পাঠান:", parse_mode="Markdown")
+        bot.register_next_step_handler(msg, lambda m: save_setting_and_notify(m, "traffic_text", "লাইভ ট্রাফিক মেসেজ"))
+
+    elif call.data == "adm_set_welc" and chat_id == ADMIN_ID:
+        bot.answer_callback_query(call.id)
+        msg = bot.send_message(chat_id, "✏️ নতুন স্বাগতম বার্তা (Welcome Message) লিখে পাঠান:\n*(নাম ব্যবহারের জন্য `{name}` লিখতে পারেন)*", parse_mode="Markdown")
+        bot.register_next_step_handler(msg, lambda m: save_setting_and_notify(m, "welcome_text", "Welcome Message"))
+
+def save_btn_and_notify(message, btn_key):
+    new_title = message.text.strip()
+    set_setting(btn_key, new_title)
+    bot.send_message(
+        ADMIN_ID, 
+        f"✅ বাটনের নাম সফলভাবে আপডেট হয়ে **`{new_title}`** হয়েছে!\n"
+        f"নতুন মেনু দেখতে `/start` চাপুন।", 
+        parse_mode="Markdown",
+        reply_markup=main_menu(ADMIN_ID)
+    )
+
+def save_setting_and_notify(message, key, name):
+    set_setting(key, message.text.strip())
+    bot.send_message(ADMIN_ID, f"✅ সফলভাবে **{name}** আপডেট করা হয়েছে!", parse_mode="Markdown")
+
+def do_add_numbers(message):
+    try:
+        parts = message.text.split()
+        country, number_list = parts[0], parts[1:]
+        added = 0
+        for num in number_list:
+            try:
+                cursor.execute("INSERT INTO numbers (country, number) VALUES (?, ?)", (country, num))
+                added += 1
+            except:
+                pass
+        conn.commit()
+        bot.send_message(ADMIN_ID, f"✅ সফলভাবে {added} টি নাম্বার যোগ হয়েছে!")
+    except:
+        bot.send_message(ADMIN_ID, "⚠️ ভুল ফরম্যাট!")
+
+def do_broadcast(message):
+    cursor.execute("SELECT user_id FROM users")
+    for (u_id,) in cursor.fetchall():
+        try:
+            bot.send_message(u_id, f"📢 ADMIN NOTICE:\n\n{message.text}")
+        except:
+            pass
+    bot.send_message(ADMIN_ID, "✅ ব্রডকাস্ট সম্পন্ন!")
+
+def do_add_balance(message):
+    try:
+        u_id, amt = message.text.split()
+        new_b = update_balance(int(u_id), float(amt))
+        bot.send_message(ADMIN_ID, f"✅ ব্যালেন্স আপডেট হয়েছে: {new_b:.3f}")
+    except:
+        bot.send_message(ADMIN_ID, "⚠️ ভুল ফরম্যাট!")
+
+print("NEOX FAST SMS [Full 100% Dynamic Bot Engine] চালু হয়েছে...")
+bot.infinity_polling()
