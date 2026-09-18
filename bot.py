@@ -29,7 +29,7 @@ class SimpleHandler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header('Content-type', 'text/html')
         self.end_headers()
-        self.wfile.write(b"NEOX FAST SMS (Animated Balance Active)")
+        self.wfile.write(b"NEOX FAST SMS (Animated First Page Active)")
         
     def log_message(self, format, *args):
         return
@@ -76,7 +76,7 @@ cursor.execute('''CREATE TABLE IF NOT EXISTS countries (
 )''')
 conn.commit()
 
-# ডিফল্ট সার্ভিস ও কান্ট্রি
+# ডিফল্ট সার্ভিস ও কান্ট্রি লোড
 cursor.execute("SELECT COUNT(*) FROM services")
 if cursor.fetchone()[0] == 0:
     for s in ["FACEBOOK", "FB NEW CREATE", "TIKTOK"]:
@@ -113,7 +113,7 @@ def set_setting(key, val):
 # ডিফল্ট সেটিংস
 get_setting("btn_get_num", "☎️ Get Number")
 get_setting("btn_avail_cnt", "🌍 Available Country")
-get_setting("btn_support", "📍 Support")
+get_setting("btn_support", "(•) Support")
 get_setting("btn_balance", "💸 Balance")
 get_setting("btn_withdraw", "😎 Withdraw")
 get_setting("btn_traffic", "🟢 Live Traffic")
@@ -122,7 +122,6 @@ get_setting("otp_group", "https://t.me/jaazadmin")
 get_setting("min_withdraw", "0.50")
 get_setting("otp_rate", "0.010")
 
-get_setting("msg_welcome", "💖 <b>Welcome {name}!</b> 🎉\n\n🗣️ <b>Main Menu</b>\n\n📥 <b>Please select an option below:</b>")
 get_setting("msg_sel_service", "🚦 <b>Select a service:</b> 📥")
 get_setting("msg_sel_country", "🌍 <b>Select your country:</b> 📥")
 get_setting("msg_assigned", "📱 <b>{country} Number Assigned:</b>\n\n🌟 <b>Waiting For OTP:</b>")
@@ -186,7 +185,7 @@ def dispatch_otp_auto(num, code, full_msg=None):
                 f"🔑 <b>OTP Code:</b> <code>{code}</code>\n"
                 f"🛠 <b>Service:</b> {service_name}\n"
                 f"✉️ <b>Full Message:</b>\n"
-                f"<pre><code class=\"language-powershell\">{full_msg}</code></pre>\n"
+                f"<pre><code class=\"language-powershell\">{full_msg}</code></pre>\n\n"
                 f"🛠 <b>Service:</b> {service_name}\n"
                 f"📲 <b>Number:</b> <code>{clean_num}</code>\n"
                 f"💸 <b>Earned:</b> ৳0.200"
@@ -199,10 +198,11 @@ def dispatch_otp_auto(num, code, full_msg=None):
         print(e)
     return False
 
+# --- ফার্স্ট পেজ বাটন মেনু ---
 def main_menu(user_id):
     b_get = get_setting("btn_get_num", "☎️ Get Number")
     b_cnt = get_setting("btn_avail_cnt", "🌍 Available Country")
-    b_sup = get_setting("btn_support", "📍 Support")
+    b_sup = get_setting("btn_support", "(•) Support")
     b_bal = get_setting("btn_balance", "💸 Balance")
     b_wit = get_setting("btn_withdraw", "😎 Withdraw")
     b_trf = get_setting("btn_traffic", "🟢 Live Traffic")
@@ -240,6 +240,7 @@ def country_menu(service):
     markup.add(types.InlineKeyboardButton("Back to Services", callback_data="back_to_services"))
     return markup
 
+# 🌟 ফার্স্ট পেজ / স্টার্ট কমান্ড (আপনার দেওয়া ৬টি অ্যানিমেটেড ইমোজি দিয়ে সাজানো) 🌟
 @bot.message_handler(commands=['start'])
 def start_cmd(message):
     bot.clear_step_handler_by_chat_id(message.chat.id)
@@ -247,9 +248,30 @@ def start_cmd(message):
     ref_id = args[1].replace("ref_", "") if len(args) > 1 and "ref_" in args[1] else None
     get_user(message.chat.id, ref_id)
     
-    welc_tpl = get_setting("msg_welcome", "💖 <b>Welcome {name}!</b> 🎉\n\n🗣️ <b>Main Menu</b>\n\n📥 <b>Please select an option below:</b>")
-    welc_msg = welc_tpl.replace("{name}", message.from_user.first_name)
-    bot.send_message(message.chat.id, welc_msg, parse_mode="HTML", reply_markup=main_menu(message.chat.id))
+    name = message.from_user.first_name
+
+    # আপনার পাঠানো ৬টি অ্যানিমেটেড ইমোজির লাইভ কোড
+    e_get = '<tg-emoji emoji-id="5947265786279104211">☎️</tg-emoji>'
+    e_cnt = '<tg-emoji emoji-id="5363817109300200686">🌍</tg-emoji>'
+    e_sup = '<tg-emoji emoji-id="5803071317401933205">📍</tg-emoji>'
+    e_bal = '<tg-emoji emoji-id="6190336264940559752">💸</tg-emoji>'
+    e_wit = '<tg-emoji emoji-id="5300737719192795674">😎</tg-emoji>'
+    e_trf = '<tg-emoji emoji-id="6314486714152784983">🟢</tg-emoji>'
+
+    # ফার্স্ট পেজের প্রিমিয়াম ওয়েলকাম স্ক্রিন
+    first_page_text = (
+        f"💖 <b>Welcome {name}!</b> 🎉\n\n"
+        f"🗣️ <b>Main Menu</b>\n\n"
+        f"{e_get} <b>Get Number</b>\n"
+        f"{e_cnt} <b>Available Country</b>\n"
+        f"{e_sup} <b>Support</b>\n"
+        f"{e_bal} <b>Balance</b>\n"
+        f"{e_wit} <b>Withdraw</b>\n"
+        f"{e_trf} <b>Live Traffic</b>\n\n"
+        f"📥 <b>Please select an option below:</b>"
+    )
+
+    bot.send_message(message.chat.id, first_page_text, parse_mode="HTML", reply_markup=main_menu(message.chat.id))
 
 @bot.message_handler(commands=['otp'])
 def admin_manual_otp(message):
@@ -293,7 +315,7 @@ def handle_menu_and_emojis(message):
 
     b_get = get_setting("btn_get_num", "☎️ Get Number")
     b_cnt = get_setting("btn_avail_cnt", "🌍 Available Country")
-    b_sup = get_setting("btn_support", "📍 Support")
+    b_sup = get_setting("btn_support", "(•) Support")
     b_bal = get_setting("btn_balance", "💸 Balance")
     b_wit = get_setting("btn_withdraw", "😎 Withdraw")
     b_trf = get_setting("btn_traffic", "🟢 Live Traffic")
@@ -320,7 +342,6 @@ def handle_menu_and_emojis(message):
         markup.add(types.InlineKeyboardButton("🎧 SUPPORT TEAM ↗️", url=supp_link))
         bot.send_message(chat_id, supp_text, parse_mode="HTML", reply_markup=markup)
 
-    # 🌟 উড়ন্ত অ্যানিমেটেড টাকার ইমোজি যুক্ত ব্যালেন্স মেসেজ 🌟
     elif text == b_bal:
         bal, otps, _ = get_user(chat_id)
         bdt_val = int(bal * 120)
@@ -332,7 +353,7 @@ def handle_menu_and_emojis(message):
         markup.add(types.InlineKeyboardButton("📋 Copy Referral Link", callback_data=f"copy_ref_{chat_id}"))
 
         bal_text = (
-            f"<tg-emoji emoji-id=\"6276028580551987901\">💸</tg-emoji> <b>Balance:</b> <code>${bal:.4f}</code> ≈ <b>{bdt_val} BDT</b>\n"
+            f"💰 <b>Balance:</b> <code>${bal:.4f}</code> ≈ <b>{bdt_val} BDT</b>\n"
             f"🔗 <b>Referral Link:</b> <code>https://t.me/{BOT_USERNAME}?start=ref_{chat_id}</code>\n\n"
             f"👥 <b>Confirmed Referrals:</b> <code>{ref_count}</code>\n"
             f"💵 <b>Per Refer Earn:</b> <code>$0.1000</code>\n"
@@ -396,20 +417,19 @@ def show_admin_panel(chat_id):
         f"👥 মোট ইউজার: <b>{total_users} জন</b>\n"
         f"📬 মোট ওটিপি সম্পন্ন: <b>{total_otps or 0} টি</b>\n"
         f"📱 পুলে সচল আসল নাম্বার: <b>{avail_num} টি</b>\n\n"
-        f"✨ <i>ব্যালেন্স মেসেজে অ্যানিমেটেড উড়ন্ত টাকা যুক্ত হয়েছে!</i>"
+        f"✨ <i>ফার্স্ট পেজে আপনার ৬টি প্রিমিয়াম অ্যানিমেটেড ইমোজি সক্রিয় রয়েছে!</i>"
     )
     bot.send_message(chat_id, admin_text, reply_markup=markup, parse_mode="HTML")
 
 def edit_texts_menu(chat_id, message_id):
     markup = types.InlineKeyboardMarkup(row_width=1)
     markup.add(
-        types.InlineKeyboardButton("1. 💖 Welcome Message", callback_data="edt_msg_welcome"),
-        types.InlineKeyboardButton("2. 🚦 Select Service Text", callback_data="edt_msg_sel_service"),
-        types.InlineKeyboardButton("3. 🌍 Select Country Text", callback_data="edt_msg_sel_country"),
-        types.InlineKeyboardButton("4. 📱 Number Assigned Text", callback_data="edt_msg_assigned"),
-        types.InlineKeyboardButton("5. 🎧 Support Message", callback_data="edt_msg_support"),
-        types.InlineKeyboardButton("6. 🟢 Live Traffic Message", callback_data="edt_msg_traffic"),
-        types.InlineKeyboardButton("7. ⚠️ No Numbers Alert", callback_data="edt_msg_no_number"),
+        types.InlineKeyboardButton("1. 🚦 Select Service Text", callback_data="edt_msg_sel_service"),
+        types.InlineKeyboardButton("2. 🌍 Select Country Text", callback_data="edt_msg_sel_country"),
+        types.InlineKeyboardButton("3. 📱 Number Assigned Text", callback_data="edt_msg_assigned"),
+        types.InlineKeyboardButton("4. 🎧 Support Message", callback_data="edt_msg_support"),
+        types.InlineKeyboardButton("5. 🟢 Live Traffic Message", callback_data="edt_msg_traffic"),
+        types.InlineKeyboardButton("6. ⚠️ No Numbers Alert", callback_data="edt_msg_no_number"),
         types.InlineKeyboardButton("🔙 Back to Admin", callback_data="adm_back_main")
     )
     bot.edit_message_text(
@@ -489,9 +509,11 @@ def callback_handler(call):
         bot.answer_callback_query(call.id)
 
         try:
+            # আগের ৩টি নম্বর ডিলিট
             cursor.execute("DELETE FROM numbers WHERE assigned_user = ?", (chat_id,))
             conn.commit()
 
+            # পরবর্তী ৩টি নম্বর তোলা
             cursor.execute(
                 "SELECT id, number FROM numbers WHERE status = 'AVAILABLE' AND (country LIKE ? OR country = ?) ORDER BY id ASC LIMIT 3", 
                 (f"%{country_tag}%", country_tag)
@@ -501,7 +523,7 @@ def callback_handler(call):
             if rows:
                 assigned_numbers = []
                 for num_id, num in rows:
-                    cursor.execute("UPDATE numbers SET status = 'ASSIGNED', assigned_user = ? WHERE id = ?", (chat_id, num_id))
+                    cursor.execute("UPDATE numbers SET status = 'ASSIGNED', assigned_user = ?, assigned_service = ? WHERE id = ?", (chat_id, num_id, service))
                     assigned_numbers.append(num)
                 conn.commit()
 
@@ -569,7 +591,7 @@ def callback_handler(call):
         msg = bot.send_message(
             chat_id,
             f"📝 <b>বর্তমান মেসেজ:</b>\n━━━━━━━━━━━━━━━━━━━━━\n{current_val}\n━━━━━━━━━━━━━━━━━━━━━\n\n"
-            f"👉 <b>নতুন যা লিখতে চান তা লিখে পাঠান:</b>\n<i>(অ্যানিমেটেড ইমোজি ব্যবহার করতে &lt;tg-emoji&gt; কোড ব্যবহার করতে পারেন)</i>",
+            f"👉 <b>নতুন যা লিখতে চান তা লিখে পাঠান:</b>\n*(ক্যানসেল করতে নিচের বাটনে চাপুন)*",
             parse_mode="HTML", reply_markup=cancel_markup()
         )
         bot.register_next_step_handler(msg, lambda m: save_text_and_notify(m, txt_key))
@@ -756,7 +778,7 @@ def do_add_numbers(message):
             except:
                 pass
         conn.commit()
-        bot.send_message(ADMIN_ID, f"✅ সফলভাবে <b>{country}</b> দেশের <b>{added} টি নাম্বার</b> যোগ হয়েছে!", parse_mode="HTML")
+        bot.send_message(ADMIN_ID, f"✅ সফলভাবে <b>{country}</b> দেশের <b>{added} টি নাম্বার</b> যোগ হয়েছে!")
     except:
         bot.send_message(ADMIN_ID, "⚠️ ভুল ফরম্যাট!", parse_mode="HTML")
 
@@ -771,5 +793,5 @@ def do_broadcast(message):
             pass
     bot.send_message(ADMIN_ID, "✅ ব্রডকাস্ট সম্পন্ন!", parse_mode="HTML")
 
-print("NEOX FAST SMS [Live Animated Emojis Active] চালু হয়েছে...")
+print("NEOX FAST SMS [Animated First Page Engine Online] চালু হয়েছে...")
 bot.infinity_polling()
