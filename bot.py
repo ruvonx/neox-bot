@@ -192,7 +192,7 @@ def dispatch_otp_auto(num, code, full_msg=None):
         print(e)
     return False
 
-# 🌟 আপনার ৬টি বাটনে অ্যানিমেটেড কাস্টম ইমোজি সরাসরি যুক্ত (অক্ষত) 🌟
+# 🌟 আপনার ৬টি বাটনে অ্যানিমেটেড কাস্টম ইমোজি (১০০% অক্ষত) 🌟
 def main_menu(user_id):
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
     try:
@@ -240,7 +240,7 @@ def country_menu(service):
     markup.add(types.InlineKeyboardButton("Back to Services", callback_data="back_to_services"))
     return markup
 
-# 👑 আপনার দেওয়া বর্ডার এবং ৪টি অ্যানিমেটেড ইমোজিসহ ভিআইপি ওয়েলকাম মেসেজ 👑
+# 👑 আপনার দেওয়া বর্ডার এবং ৪টি অ্যানিমেটেড ইমোজিসহ ভিআইপি ওয়েলকাম মেসেজ (১০০% অক্ষত) 👑
 @bot.message_handler(commands=['start'])
 def start_cmd(message):
     bot.clear_step_handler_by_chat_id(message.chat.id)
@@ -248,13 +248,11 @@ def start_cmd(message):
     ref_id = args[1].replace("ref_", "") if len(args) > 1 and "ref_" in args[1] else None
     get_user(message.chat.id, ref_id)
     
-    # আপনার পাঠানো ৪টি অ্যানিমেটেড ইমোজি কোড
     e_crown = '<tg-emoji emoji-id="5353032893096567467">👑</tg-emoji>'
     e_rocket = '<tg-emoji emoji-id="5352597830089347330">🚀</tg-emoji>'
     e_badge = '<tg-emoji emoji-id="5352694861990501856">🛡️</tg-emoji>'
     e_diamond = '<tg-emoji emoji-id="5352838545826420397">💎</tg-emoji>'
 
-    # হুবহু আপনার পাঠানো ফ্রেম ও ডিজাইনের ওয়েলকাম মেসেজ
     welcome_box_text = (
         f"╔═════════════════════╗\n"
         f"   {e_crown} ⚡ <b>NEOX FAST SMS</b>\n"
@@ -317,24 +315,41 @@ def handle_menu_and_emojis(message):
         markup.add(types.InlineKeyboardButton("🎧 SUPPORT TEAM ↗️", url=supp_link))
         bot.send_message(chat_id, supp_text, parse_mode="HTML", reply_markup=markup)
 
+    # 🌟 আপনার পাঠানো ৪টি অ্যানিমেটেড ইমোজিসহ ব্যালেন্স ও ১-ক্লিক রেফারেল কপি বাটন 🌟
     elif "Balance" in text:
         bal, otps, _ = get_user(chat_id)
         bdt_val = int(bal * 120)
-        otp_rate = float(get_setting("otp_rate", "0.010"))
+        
         cursor.execute("SELECT COUNT(*) FROM users WHERE referrer = ?", (chat_id,))
         ref_count = cursor.fetchone()[0]
 
-        markup = types.InlineKeyboardMarkup()
-        markup.add(types.InlineKeyboardButton("📋 Copy Referral Link", callback_data=f"copy_ref_{chat_id}"))
+        # আপনার পাঠানো ৪টি অ্যানিমেটেড ইমোজি কোড
+        e_bal = '<tg-emoji emoji-id="6275881112849880302">😎</tg-emoji>'
+        e_link = '<tg-emoji emoji-id="5942904397313873606">💬</tg-emoji>'
+        e_ref = '<tg-emoji emoji-id="5972240522889138094">🟢</tg-emoji>'
+        e_earn = '<tg-emoji emoji-id="5776429119868767579">💲</tg-emoji>'
 
+        ref_url = f"https://t.me/{BOT_USERNAME}?start=ref_{chat_id}"
+
+        # হুবহু স্ক্রিনশটের ডিজাইনে মেসেজ
         bal_text = (
-            f"💰 <b>Balance:</b> <code>${bal:.4f}</code> ≈ <b>{bdt_val} BDT</b>\n"
-            f"🔗 <b>Referral Link:</b> <code>https://t.me/{BOT_USERNAME}?start=ref_{chat_id}</code>\n\n"
-            f"👥 <b>Confirmed Referrals:</b> <code>{ref_count}</code>\n"
-            f"💵 <b>Per Refer Earn:</b> <code>$0.1000</code>\n"
-            f"📬 <b>Per OTP Rate:</b> <code>${otp_rate:.3f}</code>\n\n"
+            f"{e_bal} <b>Balance:</b> ${bal:.4f} ≈ {bdt_val} BDT\n"
+            f"{e_link} <b>Referral Link:</b> {ref_url}\n"
+            f"{e_ref} <b>Confirmed Referrals:</b> {ref_count}\n"
+            f"{e_earn} <b>Per Refer Earn:</b> $0.1000\n\n"
             f"ℹ️ <b>Referral System:</b> Referrals are confirmed when referred user completes 10 OTP verifications."
         )
+
+        # ১-ক্লিকেই রেফারেল লিংক কপি হওয়ার বাটন (Native Copy Icon সহ)
+        markup = types.InlineKeyboardMarkup()
+        try:
+            if hasattr(types, 'CopyTextButton'):
+                markup.add(types.InlineKeyboardButton("👤 Copy Referral Link", copy_text=types.CopyTextButton(text=ref_url)))
+            else:
+                markup.add(types.InlineKeyboardButton("👤 Copy Referral Link", callback_data=f"copy_ref_{chat_id}"))
+        except:
+            markup.add(types.InlineKeyboardButton("👤 Copy Referral Link", callback_data=f"copy_ref_{chat_id}"))
+
         bot.send_message(chat_id, bal_text, parse_mode="HTML", reply_markup=markup)
 
     elif "Withdraw" in text:
@@ -391,7 +406,7 @@ def show_admin_panel(chat_id):
         f"👥 মোট ইউজার: <b>{total_users} জন</b>\n"
         f"📬 মোট ওটিপি সম্পন্ন: <b>{total_otps or 0} টি</b>\n"
         f"📱 পুলে সচল আসল নাম্বার: <b>{avail_num} টি</b>\n\n"
-        f"✨ <i>ভিআইপি ওয়েলকাম মেসেজ ও বাটনসমূহ সক্রিয়!</i>"
+        f"✨ <i>ব্যালেন্স ও রেফারেল মেসেজ সম্পূর্ণ আপডেট করা হয়েছে!</i>"
     )
     bot.send_message(chat_id, admin_text, reply_markup=markup, parse_mode="HTML")
 
@@ -531,7 +546,8 @@ def callback_handler(call):
 
     elif call.data.startswith("copy_ref_"):
         u_ref = call.data.replace("copy_ref_", "")
-        bot.answer_callback_query(call.id, text=f"Referral Link: https://t.me/{BOT_USERNAME}?start=ref_{u_ref}")
+        ref_link = f"https://t.me/{BOT_USERNAME}?start=ref_{u_ref}"
+        bot.answer_callback_query(call.id, text=f"Copied: {ref_link}")
 
     elif call.data == "refresh_traffic":
         bot.answer_callback_query(call.id, text="Traffic refreshed!")
@@ -647,6 +663,13 @@ def callback_handler(call):
         msg = bot.send_message(chat_id, "🎁 প্রতি ওটিপির রেট (ডলারে):", parse_mode="HTML", reply_markup=cancel_markup())
         bot.register_next_step_handler(msg, lambda m: save_setting_and_notify(m, "otp_rate", "প্রতি ওটিপির রেট"))
 
+    elif call.data.startswith("rnb_") and chat_id == ADMIN_ID:
+        btn_key = call.data.replace("rnb_", "")
+        bot.answer_callback_query(call.id)
+        current_name = get_setting(btn_key, "Button")
+        msg = bot.send_message(chat_id, f"✏️ বর্তমান নাম: <code>{current_name}</code>\n\nনতুন নাম লিখে পাঠান:", parse_mode="HTML", reply_markup=cancel_markup())
+        bot.register_next_step_handler(msg, lambda m: save_btn_and_notify(m, btn_key))
+
 def save_text_and_notify(message, txt_key):
     if message.text in ["/cancel", "cancel", "বাতিল"]:
         return
@@ -694,6 +717,13 @@ def do_del_country(message):
     conn.commit()
     bot.send_message(ADMIN_ID, f"✅ সফলভাবে <b>{c_tag}</b> দেশের বাটন মুছে ফেলা হয়েছে!", parse_mode="HTML")
 
+def save_btn_and_notify(message, btn_key):
+    if message.text in ["/cancel", "cancel", "বাতিল"]:
+        return
+    new_title = message.text.strip()
+    set_setting(btn_key, new_title)
+    bot.send_message(ADMIN_ID, f"✅ বাটনের নাম আপডেট হয়ে <b><code>{new_title}</code></b> হয়েছে!", parse_mode="HTML", reply_markup=main_menu(ADMIN_ID))
+
 def save_setting_and_notify(message, key, name):
     if message.text in ["/cancel", "cancel", "বাতিল"]:
         return
@@ -731,5 +761,5 @@ def do_broadcast(message):
             pass
     bot.send_message(ADMIN_ID, "✅ ব্রডকাস্ট সম্পন্ন!", parse_mode="HTML")
 
-print("NEOX FAST SMS [VIP Animated Welcome Frame Online] চালু হয়েছে...")
+print("NEOX FAST SMS [VIP Animated Balance & 1-Click Copy Active] চালু হয়েছে...")
 bot.infinity_polling()
