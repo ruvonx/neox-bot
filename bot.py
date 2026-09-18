@@ -120,8 +120,34 @@ get_setting("msg_sel_service", "🚦 <b>Select a service:</b> 📥")
 get_setting("msg_sel_country", "🌍 <b>Select your country:</b> 📥")
 get_setting("msg_assigned", "📱 <b>{country} Number Assigned:</b>\n\n🌟 <b>Waiting For OTP:</b>")
 get_setting("msg_support", "🎧 <b>SUPPORT TEAM</b>\n\n<b>If You Need Any Help Message On Support Team</b>\n\n⏰ <b>All Time Available</b>")
-get_setting("msg_traffic", "🟢 <b>Live Traffic Active!</b>\n\n1. 🇧🇯 Benin 638 — 50.0%\n2. 🇸🇩 Sudan FB — 30.0%\n3. 🇳🇴 Norway TT — 20.0%")
 get_setting("msg_no_number", "⚠️ <b>দুঃখিত! বর্তমানে {country} দেশের কোনো চালু নাম্বার খালি নেই।</b>\n\nদয়া করে অন্য কোনো দেশ নির্বাচন করুন অথবা অ্যাডমিনকে নাম্বার লোড করতে বলুন।")
+
+# 🌟 আপনার পাঠানো ১০টি অ্যানিমেটেড ইমোজিসহ লাইভ ট্রাফিক টেক্সট 🌟
+def get_live_traffic_message():
+    custom_saved = get_setting("msg_traffic_custom", "")
+    if custom_saved:
+        return custom_saved
+
+    e_trf = '<tg-emoji emoji-id="6276077203876745608">🟢</tg-emoji>'
+    e_win = '<tg-emoji emoji-id="5413879192267805083">📅</tg-emoji>'
+    e_res = '<tg-emoji emoji-id="6012782561737054888">🎯</tg-emoji>'
+    e_top = '<tg-emoji emoji-id="6206090539989734881">🔝</tg-emoji>'
+    e_senegal = '<tg-emoji emoji-id="5434001565021123877">🇸🇳</tg-emoji>'
+    e_fire = '<tg-emoji emoji-id="5204382305455467942">🔥</tg-emoji>'
+    e_norway = '<tg-emoji emoji-id="5434147542369579483">🇳🇴</tg-emoji>'
+    e_myanmar = '<tg-emoji emoji-id="5433666360003540231">🇲🇲</tg-emoji>'
+
+    return (
+        f"{e_trf} <b>Live Traffic</b>\n\n"
+        f"{e_win} <b>Window:</b> Last 5 minutes\n"
+        f"{e_res} <b>Results Sent:</b> 100%\n"
+        f"{e_top} <b>Top Country:</b> {e_senegal} Senegal Top {e_fire}\n\n"
+        f"🌍 <b>Top Countries:</b>\n"
+        f"1. {e_senegal} Senegal Top {e_fire} — 47.8%\n"
+        f"2. {e_senegal} Senegal FB — 26.1%\n"
+        f"3. {e_norway} Norway TT — 21.7%\n"
+        f"4. {e_myanmar} Myanmar FB — 4.3%"
+    )
 
 def cancel_markup():
     markup = types.InlineKeyboardMarkup()
@@ -192,7 +218,7 @@ def dispatch_otp_auto(num, code, full_msg=None):
         print(e)
     return False
 
-# 🌟 আপনার ৬টি বাটনে অ্যানিমেটেড কাস্টম ইমোজি (১০০% অক্ষত) 🌟
+# 🌟 আপনার ৬টি বাটনে অ্যানিমেটেড কাস্টম ইমোজি সরাসরি যুক্ত 🌟
 def main_menu(user_id):
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
     try:
@@ -240,7 +266,7 @@ def country_menu(service):
     markup.add(types.InlineKeyboardButton("Back to Services", callback_data="back_to_services"))
     return markup
 
-# 👑 আপনার দেওয়া বর্ডার এবং ৪টি অ্যানিমেটেড ইমোজিসহ ভিআইপি ওয়েলকাম মেসেজ (১০০% অক্ষত) 👑
+# 👑 আপনার দেওয়া বর্ডার এবং ৪টি অ্যানিমেটেড ইমোজিসহ ভিআইপি ওয়েলকাম মেসেজ 👑
 @bot.message_handler(commands=['start'])
 def start_cmd(message):
     bot.clear_step_handler_by_chat_id(message.chat.id)
@@ -315,7 +341,7 @@ def handle_menu_and_emojis(message):
         markup.add(types.InlineKeyboardButton("🎧 SUPPORT TEAM ↗️", url=supp_link))
         bot.send_message(chat_id, supp_text, parse_mode="HTML", reply_markup=markup)
 
-    # 🌟 আপনার পাঠানো ৪টি অ্যানিমেটেড ইমোজিসহ ব্যালেন্স ও ১-ক্লিক রেফারেল কপি বাটন 🌟
+    # 🌟 ৪টি অ্যানিমেটেড ইমোজিসহ ব্যালেন্স ও ১-ক্লিক কপি রেফারেল লিংক 🌟
     elif "Balance" in text:
         bal, otps, _ = get_user(chat_id)
         bdt_val = int(bal * 120)
@@ -323,7 +349,6 @@ def handle_menu_and_emojis(message):
         cursor.execute("SELECT COUNT(*) FROM users WHERE referrer = ?", (chat_id,))
         ref_count = cursor.fetchone()[0]
 
-        # আপনার পাঠানো ৪টি অ্যানিমেটেড ইমোজি কোড
         e_bal = '<tg-emoji emoji-id="6275881112849880302">😎</tg-emoji>'
         e_link = '<tg-emoji emoji-id="5942904397313873606">💬</tg-emoji>'
         e_ref = '<tg-emoji emoji-id="5972240522889138094">🟢</tg-emoji>'
@@ -331,7 +356,6 @@ def handle_menu_and_emojis(message):
 
         ref_url = f"https://t.me/{BOT_USERNAME}?start=ref_{chat_id}"
 
-        # হুবহু স্ক্রিনশটের ডিজাইনে মেসেজ
         bal_text = (
             f"{e_bal} <b>Balance:</b> ${bal:.4f} ≈ {bdt_val} BDT\n"
             f"{e_link} <b>Referral Link:</b> {ref_url}\n"
@@ -340,7 +364,6 @@ def handle_menu_and_emojis(message):
             f"ℹ️ <b>Referral System:</b> Referrals are confirmed when referred user completes 10 OTP verifications."
         )
 
-        # ১-ক্লিকেই রেফারেল লিংক কপি হওয়ার বাটন (Native Copy Icon সহ)
         markup = types.InlineKeyboardMarkup()
         try:
             if hasattr(types, 'CopyTextButton'):
@@ -361,8 +384,9 @@ def handle_menu_and_emojis(message):
             msg = bot.send_message(chat_id, "💳 <b>আপনার পেমেন্ট তথ্য দিন:</b>\n\nবিকাশ / নগদ নম্বর অথবা Binance Pay ID লিখে পাঠান:", parse_mode="HTML", reply_markup=cancel_markup())
             bot.register_next_step_handler(msg, process_withdraw, bal)
 
+    # 🌟 ১০টি অ্যানিমেটেড ইমোজিসহ লাইভ ট্রাফিক 🌟
     elif "Live Traffic" in text:
-        live_msg = get_setting("msg_traffic", "🟢 Live Traffic Active!")
+        live_msg = get_live_traffic_message()
         markup = types.InlineKeyboardMarkup()
         markup.add(types.InlineKeyboardButton("🔄 Refresh", callback_data="refresh_traffic"))
         bot.send_message(chat_id, live_msg, parse_mode="HTML", reply_markup=markup)
@@ -406,7 +430,7 @@ def show_admin_panel(chat_id):
         f"👥 মোট ইউজার: <b>{total_users} জন</b>\n"
         f"📬 মোট ওটিপি সম্পন্ন: <b>{total_otps or 0} টি</b>\n"
         f"📱 পুলে সচল আসল নাম্বার: <b>{avail_num} টি</b>\n\n"
-        f"✨ <i>ব্যালেন্স ও রেফারেল মেসেজ সম্পূর্ণ আপডেট করা হয়েছে!</i>"
+        f"✨ <i>সবগুলো অ্যানিমেটেড ইমোজি ও ফিচার পুরোপুরি সক্রিয়!</i>"
     )
     bot.send_message(chat_id, admin_text, reply_markup=markup, parse_mode="HTML")
 
@@ -549,8 +573,15 @@ def callback_handler(call):
         ref_link = f"https://t.me/{BOT_USERNAME}?start=ref_{u_ref}"
         bot.answer_callback_query(call.id, text=f"Copied: {ref_link}")
 
+    # 🌟 লাইভ ট্রাফিকের স্মুথ রিফ্রেশ 🌟
     elif call.data == "refresh_traffic":
         bot.answer_callback_query(call.id, text="Traffic refreshed!")
+        try:
+            markup = types.InlineKeyboardMarkup()
+            markup.add(types.InlineKeyboardButton("🔄 Refresh", callback_data="refresh_traffic"))
+            bot.edit_message_text(chat_id=chat_id, message_id=message_id, text=get_live_traffic_message(), parse_mode="HTML", reply_markup=markup)
+        except:
+            pass
 
     elif call.data.startswith("wapp_") and chat_id == ADMIN_ID:
         _, w_id, u_id, amt = call.data.split("_")
@@ -663,17 +694,13 @@ def callback_handler(call):
         msg = bot.send_message(chat_id, "🎁 প্রতি ওটিপির রেট (ডলারে):", parse_mode="HTML", reply_markup=cancel_markup())
         bot.register_next_step_handler(msg, lambda m: save_setting_and_notify(m, "otp_rate", "প্রতি ওটিপির রেট"))
 
-    elif call.data.startswith("rnb_") and chat_id == ADMIN_ID:
-        btn_key = call.data.replace("rnb_", "")
-        bot.answer_callback_query(call.id)
-        current_name = get_setting(btn_key, "Button")
-        msg = bot.send_message(chat_id, f"✏️ বর্তমান নাম: <code>{current_name}</code>\n\nনতুন নাম লিখে পাঠান:", parse_mode="HTML", reply_markup=cancel_markup())
-        bot.register_next_step_handler(msg, lambda m: save_btn_and_notify(m, btn_key))
-
 def save_text_and_notify(message, txt_key):
     if message.text in ["/cancel", "cancel", "বাতিল"]:
         return
-    set_setting(txt_key, message.text.strip())
+    if txt_key == "msg_traffic":
+        set_setting("msg_traffic_custom", message.text.strip())
+    else:
+        set_setting(txt_key, message.text.strip())
     bot.send_message(ADMIN_ID, "✅ <b>মেসেজটি সফলভাবে আপডেট করা হয়েছে!</b>", parse_mode="HTML")
     show_admin_panel(ADMIN_ID)
 
@@ -717,13 +744,6 @@ def do_del_country(message):
     conn.commit()
     bot.send_message(ADMIN_ID, f"✅ সফলভাবে <b>{c_tag}</b> দেশের বাটন মুছে ফেলা হয়েছে!", parse_mode="HTML")
 
-def save_btn_and_notify(message, btn_key):
-    if message.text in ["/cancel", "cancel", "বাতিল"]:
-        return
-    new_title = message.text.strip()
-    set_setting(btn_key, new_title)
-    bot.send_message(ADMIN_ID, f"✅ বাটনের নাম আপডেট হয়ে <b><code>{new_title}</code></b> হয়েছে!", parse_mode="HTML", reply_markup=main_menu(ADMIN_ID))
-
 def save_setting_and_notify(message, key, name):
     if message.text in ["/cancel", "cancel", "বাতিল"]:
         return
@@ -761,5 +781,5 @@ def do_broadcast(message):
             pass
     bot.send_message(ADMIN_ID, "✅ ব্রডকাস্ট সম্পন্ন!", parse_mode="HTML")
 
-print("NEOX FAST SMS [VIP Animated Balance & 1-Click Copy Active] চালু হয়েছে...")
+print("NEOX FAST SMS [Live Traffic Animated & 100% Protected] চালু হয়েছে...")
 bot.infinity_polling()
