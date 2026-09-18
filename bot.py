@@ -347,15 +347,16 @@ def handle_menu_and_emojis(message):
             c_text += "বর্তমানে পুলে কোনো নাম্বার খালি নেই।"
         bot.send_message(chat_id, c_text, parse_mode="HTML")
 
-    # 🌟 আপনার পাঠানো ২টি অ্যানিমেটেড ইমোজিসহ সাপোর্ট মেসেজ 🌟
+    # 🌟 সাপোর্ট মেসেজ (AZ বটের মতো ক্লিন বাটন সহ) 🌟
     elif "Support" in text:
         supp_link = get_setting("support_link", "https://t.me/jaazadmin")
         supp_text = get_support_message()
         markup = types.InlineKeyboardMarkup()
-        markup.add(types.InlineKeyboardButton("🎧 NEOX SUPPORT ↗️", url=supp_link))
+        # বড় নীল বক্স অ্যারো রিমুভ করে AZ বটের মতো ক্লিন ২৪/৭ বাটন
+        markup.add(types.InlineKeyboardButton("🎧 24/7 NEOX SUPPORT ↗", url=supp_link))
         bot.send_message(chat_id, supp_text, parse_mode="HTML", reply_markup=markup)
 
-    # 🌟 ৪টি অ্যানিমেটেড ইমোজিসহ ব্যালেন্স ও ১-ক্লিক কপি রেফারেল লিংক (অক্ষত) 🌟
+    # 🌟 ৪টি অ্যানিমেটেড ইমোজিসহ ব্যালেন্স ও ১-ক্লিক কপি রেফারেল লিংক 🌟
     elif "Balance" in text:
         bal, otps, _ = get_user(chat_id)
         bdt_val = int(bal * 120)
@@ -398,7 +399,7 @@ def handle_menu_and_emojis(message):
             msg = bot.send_message(chat_id, "💳 <b>আপনার পেমেন্ট তথ্য দিন:</b>\n\nবিকাশ / নগদ নম্বর অথবা Binance Pay ID লিখে পাঠান:", parse_mode="HTML", reply_markup=cancel_markup())
             bot.register_next_step_handler(msg, process_withdraw, bal)
 
-    # 🌟 ১০টি অ্যানিমেটেড ইমোজিসহ লাইভ ট্রাফিক (অক্ষত) 🌟
+    # 🌟 ১০টি অ্যানিমেটেড ইমোজিসহ লাইভ ট্রাফিক 🌟
     elif "Live Traffic" in text:
         live_msg = get_live_traffic_message()
         markup = types.InlineKeyboardMarkup()
@@ -444,7 +445,7 @@ def show_admin_panel(chat_id):
         f"👥 মোট ইউজার: <b>{total_users} জন</b>\n"
         f"📬 মোট ওটিপি সম্পন্ন: <b>{total_otps or 0} টি</b>\n"
         f"📱 পুলে সচল আসল নাম্বার: <b>{avail_num} টি</b>\n\n"
-        f"✨ <i>সাপোর্ট মেসেজে অ্যানিমেটেড ইমোজি সক্রিয়!</i>"
+        f"✨ <i>সাপোর্টের বাটন সম্পূর্ণ ক্লিন ও আধুনিক করা হয়েছে!</i>"
     )
     bot.send_message(chat_id, admin_text, reply_markup=markup, parse_mode="HTML")
 
@@ -562,17 +563,17 @@ def callback_handler(call):
                 markup.add(
                     types.InlineKeyboardButton("🔄 Change Number", callback_data=f"cnt_{country_tag}_{service}"),
                     types.InlineKeyboardButton("🌐 Change Country", callback_data=f"svc_{service}"),
-                    types.InlineKeyboardButton("📢 OTP Group ↗️", url=otp_group_link)
+                    types.InlineKeyboardButton("📢 OTP Group ↗", url=otp_group_link)
                 )
 
-                assigned_tpl = get_setting("msg_assigned", "📱 <b>{country} Number Assigned:</b>\n\n🌟 <b>Waiting For OTP:</b>")
+                assigned_tpl = get_setting("msg_assigned", "📱 **{country} Number Assigned:**\n\n🌟 **Waiting For OTP:**")
                 assigned_msg = assigned_tpl.replace("{country}", country_tag)
                 
                 bot.edit_message_text(chat_id=chat_id, message_id=message_id, text=assigned_msg, parse_mode="HTML", reply_markup=markup)
             else:
                 markup = types.InlineKeyboardMarkup()
                 markup.add(types.InlineKeyboardButton("🔙 Choose Another Country", callback_data=f"svc_{service}"))
-                no_num_tpl = get_setting("msg_no_number", "⚠️ <b>দুঃখিত! বর্তমানে {country} দেশের কোনো চালু নাম্বার খালি নেই।</b>")
+                no_num_tpl = get_setting("msg_no_number", "⚠️ **দুঃখিত! বর্তমানে {country} দেশের কোনো চালু নাম্বার খালি নেই।**")
                 no_num_msg = no_num_tpl.replace("{country}", country_tag)
                 bot.edit_message_text(chat_id=chat_id, message_id=message_id, text=no_num_msg, parse_mode="HTML", reply_markup=markup)
         except Exception as e:
@@ -796,5 +797,5 @@ def do_broadcast(message):
             pass
     bot.send_message(ADMIN_ID, "✅ ব্রডকাস্ট সম্পন্ন!", parse_mode="HTML")
 
-print("NEOX FAST SMS [Support Animated & 100% Protected] চালু হয়েছে...")
+print("NEOX FAST SMS [Clean Button Style Active] চালু হয়েছে...")
 bot.infinity_polling()
