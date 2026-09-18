@@ -347,16 +347,21 @@ def handle_menu_and_emojis(message):
             c_text += "বর্তমানে পুলে কোনো নাম্বার খালি নেই।"
         bot.send_message(chat_id, c_text, parse_mode="HTML")
 
-    # 🌟 সাপোর্ট মেসেজ (AZ বটের মতো ক্লিন বাটন সহ) 🌟
+    # 🌟 গ্রিন ২৪/৭ কাস্টম ইমোজিসহ সাপোর্ট বাটন 🌟
     elif "Support" in text:
         supp_link = get_setting("support_link", "https://t.me/jaazadmin")
         supp_text = get_support_message()
         markup = types.InlineKeyboardMarkup()
-        # বড় নীল বক্স অ্যারো রিমুভ করে AZ বটের মতো ক্লিন ২৪/৭ বাটন
-        markup.add(types.InlineKeyboardButton("🎧 24/7 NEOX SUPPORT ↗", url=supp_link))
+        
+        # আপনার পাঠানো গ্রিন ২৪/৭ অ্যানিমেটেড ইমোজি আইডি দিয়ে বাটন
+        try:
+            markup.add(types.InlineKeyboardButton("NEOX SUPPORT ↗", url=supp_link, icon_custom_emoji_id="5188635482174546097"))
+        except:
+            markup.add(types.InlineKeyboardButton("🔄 24/7 NEOX SUPPORT ↗", url=supp_link))
+            
         bot.send_message(chat_id, supp_text, parse_mode="HTML", reply_markup=markup)
 
-    # 🌟 ৪টি অ্যানিমেটেড ইমোজিসহ ব্যালেন্স ও ১-ক্লিক কপি রেফারেল লিংক 🌟
+    # 🌟 ৪টি অ্যানিমেটেড ইমোজিসহ ব্যালেন্স ও ১-ক্লিক কপি রেফারেল লিংক (অক্ষত) 🌟
     elif "Balance" in text:
         bal, otps, _ = get_user(chat_id)
         bdt_val = int(bal * 120)
@@ -399,7 +404,7 @@ def handle_menu_and_emojis(message):
             msg = bot.send_message(chat_id, "💳 <b>আপনার পেমেন্ট তথ্য দিন:</b>\n\nবিকাশ / নগদ নম্বর অথবা Binance Pay ID লিখে পাঠান:", parse_mode="HTML", reply_markup=cancel_markup())
             bot.register_next_step_handler(msg, process_withdraw, bal)
 
-    # 🌟 ১০টি অ্যানিমেটেড ইমোজিসহ লাইভ ট্রাফিক 🌟
+    # 🌟 ১০টি অ্যানিমেটেড ইমোজিসহ লাইভ ট্রাফিক (অক্ষত) 🌟
     elif "Live Traffic" in text:
         live_msg = get_live_traffic_message()
         markup = types.InlineKeyboardMarkup()
@@ -445,7 +450,7 @@ def show_admin_panel(chat_id):
         f"👥 মোট ইউজার: <b>{total_users} জন</b>\n"
         f"📬 মোট ওটিপি সম্পন্ন: <b>{total_otps or 0} টি</b>\n"
         f"📱 পুলে সচল আসল নাম্বার: <b>{avail_num} টি</b>\n\n"
-        f"✨ <i>সাপোর্টের বাটন সম্পূর্ণ ক্লিন ও আধুনিক করা হয়েছে!</i>"
+        f"✨ <i>সাপোর্ট বাটনে গ্রিন ২৪/৭ আইকন সফলভাবে সেট হয়েছে!</i>"
     )
     bot.send_message(chat_id, admin_text, reply_markup=markup, parse_mode="HTML")
 
@@ -797,5 +802,5 @@ def do_broadcast(message):
             pass
     bot.send_message(ADMIN_ID, "✅ ব্রডকাস্ট সম্পন্ন!", parse_mode="HTML")
 
-print("NEOX FAST SMS [Clean Button Style Active] চালু হয়েছে...")
+print("NEOX FAST SMS [Green 24/7 Support Custom Icon Active] চালু হয়েছে...")
 bot.infinity_polling()
