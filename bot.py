@@ -119,10 +119,23 @@ get_setting("otp_rate", "0.010")
 get_setting("msg_sel_service", "🚦 <b>Select a service:</b> 📥")
 get_setting("msg_sel_country", "🌍 <b>Select your country:</b> 📥")
 get_setting("msg_assigned", "📱 <b>{country} Number Assigned:</b>\n\n🌟 <b>Waiting For OTP:</b>")
-get_setting("msg_support", "🎧 <b>SUPPORT TEAM</b>\n\n<b>If You Need Any Help Message On Support Team</b>\n\n⏰ <b>All Time Available</b>")
 get_setting("msg_no_number", "⚠️ <b>দুঃখিত! বর্তমানে {country} দেশের কোনো চালু নাম্বার খালি নেই।</b>\n\nদয়া করে অন্য কোনো দেশ নির্বাচন করুন অথবা অ্যাডমিনকে নাম্বার লোড করতে বলুন।")
 
-# 🌟 আপনার পাঠানো ১০টি অ্যানিমেটেড ইমোজিসহ লাইভ ট্রাফিক টেক্সট 🌟
+# 🌟 আপনার পাঠানো ২টি অ্যানিমেটেড ইমোজিসহ সাপোর্ট মেসেজ 🌟
+def get_support_message():
+    custom = get_setting("msg_support_custom", "")
+    if custom:
+        return custom
+    e_badge = '<tg-emoji emoji-id="5377676285864595613">🛡️</tg-emoji>'
+    e_arrow = '<tg-emoji emoji-id="5197474438970363734">⤵️</tg-emoji>'
+    return (
+        f"{e_badge} <b>NEOX SUPPORT</b>\n\n"
+        f"If You Need Any Help\n"
+        f"Message On Support Team\n\n"
+        f"{e_arrow} <b>All Time Available</b>"
+    )
+
+# 🌟 লাইভ ট্রাফিকের মেসেজ (১০টি অ্যানিমেটেড ইমোজি অক্ষত) 🌟
 def get_live_traffic_message():
     custom_saved = get_setting("msg_traffic_custom", "")
     if custom_saved:
@@ -218,7 +231,7 @@ def dispatch_otp_auto(num, code, full_msg=None):
         print(e)
     return False
 
-# 🌟 আপনার ৬টি বাটনে অ্যানিমেটেড কাস্টম ইমোজি সরাসরি যুক্ত 🌟
+# 🌟 আপনার ৬টি বাটনে অ্যানিমেটেড কাস্টম ইমোজি সরাসরি যুক্ত (অক্ষত) 🌟
 def main_menu(user_id):
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
     try:
@@ -266,7 +279,7 @@ def country_menu(service):
     markup.add(types.InlineKeyboardButton("Back to Services", callback_data="back_to_services"))
     return markup
 
-# 👑 আপনার দেওয়া বর্ডার এবং ৪টি অ্যানিমেটেড ইমোজিসহ ভিআইপি ওয়েলকাম মেসেজ 👑
+# 👑 ৪টি অ্যানিমেটেড ইমোজিসহ ওয়েলকাম ফ্রেম (অক্ষত) 👑
 @bot.message_handler(commands=['start'])
 def start_cmd(message):
     bot.clear_step_handler_by_chat_id(message.chat.id)
@@ -334,14 +347,15 @@ def handle_menu_and_emojis(message):
             c_text += "বর্তমানে পুলে কোনো নাম্বার খালি নেই।"
         bot.send_message(chat_id, c_text, parse_mode="HTML")
 
+    # 🌟 আপনার পাঠানো ২টি অ্যানিমেটেড ইমোজিসহ সাপোর্ট মেসেজ 🌟
     elif "Support" in text:
         supp_link = get_setting("support_link", "https://t.me/jaazadmin")
-        supp_text = get_setting("msg_support", "🎧 <b>SUPPORT TEAM</b>\n\n<b>If You Need Any Help Message On Support Team</b>\n\n⏰ <b>All Time Available</b>")
+        supp_text = get_support_message()
         markup = types.InlineKeyboardMarkup()
-        markup.add(types.InlineKeyboardButton("🎧 SUPPORT TEAM ↗️", url=supp_link))
+        markup.add(types.InlineKeyboardButton("🎧 NEOX SUPPORT ↗️", url=supp_link))
         bot.send_message(chat_id, supp_text, parse_mode="HTML", reply_markup=markup)
 
-    # 🌟 ৪টি অ্যানিমেটেড ইমোজিসহ ব্যালেন্স ও ১-ক্লিক কপি রেফারেল লিংক 🌟
+    # 🌟 ৪টি অ্যানিমেটেড ইমোজিসহ ব্যালেন্স ও ১-ক্লিক কপি রেফারেল লিংক (অক্ষত) 🌟
     elif "Balance" in text:
         bal, otps, _ = get_user(chat_id)
         bdt_val = int(bal * 120)
@@ -384,7 +398,7 @@ def handle_menu_and_emojis(message):
             msg = bot.send_message(chat_id, "💳 <b>আপনার পেমেন্ট তথ্য দিন:</b>\n\nবিকাশ / নগদ নম্বর অথবা Binance Pay ID লিখে পাঠান:", parse_mode="HTML", reply_markup=cancel_markup())
             bot.register_next_step_handler(msg, process_withdraw, bal)
 
-    # 🌟 ১০টি অ্যানিমেটেড ইমোজিসহ লাইভ ট্রাফিক 🌟
+    # 🌟 ১০টি অ্যানিমেটেড ইমোজিসহ লাইভ ট্রাফিক (অক্ষত) 🌟
     elif "Live Traffic" in text:
         live_msg = get_live_traffic_message()
         markup = types.InlineKeyboardMarkup()
@@ -430,7 +444,7 @@ def show_admin_panel(chat_id):
         f"👥 মোট ইউজার: <b>{total_users} জন</b>\n"
         f"📬 মোট ওটিপি সম্পন্ন: <b>{total_otps or 0} টি</b>\n"
         f"📱 পুলে সচল আসল নাম্বার: <b>{avail_num} টি</b>\n\n"
-        f"✨ <i>সবগুলো অ্যানিমেটেড ইমোজি ও ফিচার পুরোপুরি সক্রিয়!</i>"
+        f"✨ <i>সাপোর্ট মেসেজে অ্যানিমেটেড ইমোজি সক্রিয়!</i>"
     )
     bot.send_message(chat_id, admin_text, reply_markup=markup, parse_mode="HTML")
 
@@ -480,7 +494,7 @@ def process_withdraw(message, balance):
         reply_markup=markup
     )
 
-# --- ইনলাইন বাটন হ্যান্ডলার (৩টি ফ্রেশ নাম্বার ও অটো-ডিলিট ইঞ্জিন) ---
+# --- ইনলাইন বাটন হ্যান্ডলার (৩টি ফ্রেশ নাম্বার ও অটো-ডিলিট ইঞ্জিন অক্ষত) ---
 @bot.callback_query_handler(func=lambda call: True)
 def callback_handler(call):
     chat_id = call.message.chat.id
@@ -573,7 +587,6 @@ def callback_handler(call):
         ref_link = f"https://t.me/{BOT_USERNAME}?start=ref_{u_ref}"
         bot.answer_callback_query(call.id, text=f"Copied: {ref_link}")
 
-    # 🌟 লাইভ ট্রাফিকের স্মুথ রিফ্রেশ 🌟
     elif call.data == "refresh_traffic":
         bot.answer_callback_query(call.id, text="Traffic refreshed!")
         try:
@@ -699,6 +712,8 @@ def save_text_and_notify(message, txt_key):
         return
     if txt_key == "msg_traffic":
         set_setting("msg_traffic_custom", message.text.strip())
+    elif txt_key == "msg_support":
+        set_setting("msg_support_custom", message.text.strip())
     else:
         set_setting(txt_key, message.text.strip())
     bot.send_message(ADMIN_ID, "✅ <b>মেসেজটি সফলভাবে আপডেট করা হয়েছে!</b>", parse_mode="HTML")
@@ -781,5 +796,5 @@ def do_broadcast(message):
             pass
     bot.send_message(ADMIN_ID, "✅ ব্রডকাস্ট সম্পন্ন!", parse_mode="HTML")
 
-print("NEOX FAST SMS [Live Traffic Animated & 100% Protected] চালু হয়েছে...")
+print("NEOX FAST SMS [Support Animated & 100% Protected] চালু হয়েছে...")
 bot.infinity_polling()
