@@ -29,7 +29,7 @@ class SimpleHandler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header('Content-type', 'text/html')
         self.end_headers()
-        self.wfile.write(b"NEOX FAST SMS (Animated Emojis Engine Active)")
+        self.wfile.write(b"NEOX FAST SMS (Animated Balance Active)")
         
     def log_message(self, format, *args):
         return
@@ -272,13 +272,12 @@ def cancel_command(message):
     if message.chat.id == ADMIN_ID:
         show_admin_panel(message.chat.id)
 
-# 🌟 ম্যাজিক এনিমেটেড ইমোজি স্ক্যানার (অ্যাডমিনের জন্য)
 @bot.message_handler(content_types=['text'])
 def handle_menu_and_emojis(message):
     chat_id = message.chat.id
     text = message.text
 
-    # যদি অ্যাডমিন কোনো অ্যানিমেটেড কাস্টম ইমোজি সেন্ড করে, বট তার আইডি বের করে দেবে
+    # ইমোজি স্ক্যানার
     if chat_id == ADMIN_ID and message.entities:
         for entity in message.entities:
             if entity.type == "custom_emoji":
@@ -286,9 +285,8 @@ def handle_menu_and_emojis(message):
                 info_text = (
                     f"✨ <b>অ্যানিমেটেড ইমোজির তথ্য পাওয়া গেছে!</b>\n\n"
                     f"🆔 <b>Emoji ID:</b> <code>{emoji_id}</code>\n\n"
-                    f"📋 <b>বটের যে-কোনো মেসেজে অ্যানিমেট করানোর কোড:</b>\n"
-                    f"<code>&lt;tg-emoji emoji-id=\"{emoji_id}\"&gt;⭐&lt;/tg-emoji&gt;</code>\n\n"
-                    f"<i>(এটি কপি করে মেসেজ এডিটরে বসিয়ে দিলেই ইমোজিটি জীবন্ত নড়াচড়া করবে!)</i>"
+                    f"📋 <b>কোড:</b>\n"
+                    f"<code>&lt;tg-emoji emoji-id=\"{emoji_id}\"&gt;⭐&lt;/tg-emoji&gt;</code>"
                 )
                 bot.reply_to(message, info_text, parse_mode="HTML")
                 return
@@ -322,6 +320,7 @@ def handle_menu_and_emojis(message):
         markup.add(types.InlineKeyboardButton("🎧 SUPPORT TEAM ↗️", url=supp_link))
         bot.send_message(chat_id, supp_text, parse_mode="HTML", reply_markup=markup)
 
+    # 🌟 উড়ন্ত অ্যানিমেটেড টাকার ইমোজি যুক্ত ব্যালেন্স মেসেজ 🌟
     elif text == b_bal:
         bal, otps, _ = get_user(chat_id)
         bdt_val = int(bal * 120)
@@ -333,11 +332,12 @@ def handle_menu_and_emojis(message):
         markup.add(types.InlineKeyboardButton("📋 Copy Referral Link", callback_data=f"copy_ref_{chat_id}"))
 
         bal_text = (
-            f"💰 <b>Balance:</b> <code>${bal:.4f}</code> ≈ <b>{bdt_val} BDT</b>\n"
+            f"<tg-emoji emoji-id=\"6276028580551987901\">💸</tg-emoji> <b>Balance:</b> <code>${bal:.4f}</code> ≈ <b>{bdt_val} BDT</b>\n"
             f"🔗 <b>Referral Link:</b> <code>https://t.me/{BOT_USERNAME}?start=ref_{chat_id}</code>\n\n"
             f"👥 <b>Confirmed Referrals:</b> <code>{ref_count}</code>\n"
             f"💵 <b>Per Refer Earn:</b> <code>$0.1000</code>\n"
-            f"📬 <b>Per OTP Rate:</b> <code>${otp_rate:.3f}</code>"
+            f"📬 <b>Per OTP Rate:</b> <code>${otp_rate:.3f}</code>\n\n"
+            f"ℹ️ <b>Referral System:</b> Referrals are confirmed when referred user completes 10 OTP verifications."
         )
         bot.send_message(chat_id, bal_text, parse_mode="HTML", reply_markup=markup)
 
@@ -396,7 +396,7 @@ def show_admin_panel(chat_id):
         f"👥 মোট ইউজার: <b>{total_users} জন</b>\n"
         f"📬 মোট ওটিপি সম্পন্ন: <b>{total_otps or 0} টি</b>\n"
         f"📱 পুলে সচল আসল নাম্বার: <b>{avail_num} টি</b>\n\n"
-        f"✨ <i>যেকোনো প্রিমিয়াম অ্যানিমেটেড ইমোজি ইনবক্সে পাঠিয়ে তার কোড জেনে নিতে পারেন!</i>"
+        f"✨ <i>ব্যালেন্স মেসেজে অ্যানিমেটেড উড়ন্ত টাকা যুক্ত হয়েছে!</i>"
     )
     bot.send_message(chat_id, admin_text, reply_markup=markup, parse_mode="HTML")
 
@@ -447,7 +447,6 @@ def process_withdraw(message, balance):
         reply_markup=markup
     )
 
-# --- ইনলাইন বাটন হ্যান্ডলার ---
 @bot.callback_query_handler(func=lambda call: True)
 def callback_handler(call):
     chat_id = call.message.chat.id
@@ -490,11 +489,9 @@ def callback_handler(call):
         bot.answer_callback_query(call.id)
 
         try:
-            # ১. আগের সব নাম্বার ডিলিট
             cursor.execute("DELETE FROM numbers WHERE assigned_user = ?", (chat_id,))
             conn.commit()
 
-            # ২. পরবর্তী ৩টি আসল নাম্বার তোলা
             cursor.execute(
                 "SELECT id, number FROM numbers WHERE status = 'AVAILABLE' AND (country LIKE ? OR country = ?) ORDER BY id ASC LIMIT 3", 
                 (f"%{country_tag}%", country_tag)
@@ -774,5 +771,5 @@ def do_broadcast(message):
             pass
     bot.send_message(ADMIN_ID, "✅ ব্রডকাস্ট সম্পন্ন!", parse_mode="HTML")
 
-print("NEOX FAST SMS [Animated Emojis Engine Online] চালু হয়েছে...")
+print("NEOX FAST SMS [Live Animated Emojis Active] চালু হয়েছে...")
 bot.infinity_polling()
