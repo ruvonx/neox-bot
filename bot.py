@@ -121,7 +121,7 @@ get_setting("msg_sel_country", "🌍 <b>Select your country:</b> 📥")
 get_setting("msg_assigned", "📱 <b>{country} Number Assigned:</b>\n\n🌟 <b>Waiting For OTP:</b>")
 get_setting("msg_no_number", "⚠️ <b>দুঃখিত! বর্তমানে {country} দেশের কোনো চালু নাম্বার খালি নেই।</b>\n\nদয়া করে অন্য কোনো দেশ নির্বাচন করুন অথবা অ্যাডমিনকে নাম্বার লোড করতে বলুন।")
 
-# 🌟 আপনার পাঠানো ২টি অ্যানিমেটেড ইমোজিসহ সাপোর্ট মেসেজ 🌟
+# 🌟 সাপোর্ট মেসেজ 🌟
 def get_support_message():
     custom = get_setting("msg_support_custom", "")
     if custom:
@@ -135,7 +135,7 @@ def get_support_message():
         f"{e_arrow} <b>All Time Available</b>"
     )
 
-# 🌟 লাইভ ট্রাফিকের মেসেজ (১০টি অ্যানিমেটেড ইমোজি অক্ষত) 🌟
+# 🌟 লাইভ ট্রাফিকের মেসেজ 🌟
 def get_live_traffic_message():
     custom_saved = get_setting("msg_traffic_custom", "")
     if custom_saved:
@@ -231,7 +231,7 @@ def dispatch_otp_auto(num, code, full_msg=None):
         print(e)
     return False
 
-# 🌟 আপনার ৬টি বাটনে অ্যানিমেটেড কাস্টম ইমোজি সরাসরি যুক্ত (অক্ষত) 🌟
+# 🌟 আপনার ৬টি বাটনে অ্যানিমেটেড কাস্টম ইমোজি সরাসরি যুক্ত 🌟
 def main_menu(user_id):
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
     try:
@@ -279,7 +279,7 @@ def country_menu(service):
     markup.add(types.InlineKeyboardButton("Back to Services", callback_data="back_to_services"))
     return markup
 
-# 👑 ৪টি অ্যানিমেটেড ইমোজিসহ ওয়েলকাম ফ্রেম (অক্ষত) 👑
+# 👑 ৪টি অ্যানিমেটেড ইমোজিসহ ওয়েলকাম ফ্রেম 👑
 @bot.message_handler(commands=['start'])
 def start_cmd(message):
     bot.clear_step_handler_by_chat_id(message.chat.id)
@@ -347,21 +347,21 @@ def handle_menu_and_emojis(message):
             c_text += "বর্তমানে পুলে কোনো নাম্বার খালি নেই।"
         bot.send_message(chat_id, c_text, parse_mode="HTML")
 
-    # 🌟 গ্রিন ২৪/৭ কাস্টম ইমোজিসহ সাপোর্ট বাটন 🌟
+    # 🌟 সাপোর্ট মেসেজ (কোনো তীর বা নীল বক্স ছাড়া একদম পরিচ্ছন্ন) 🌟
     elif "Support" in text:
         supp_link = get_setting("support_link", "https://t.me/jaazadmin")
         supp_text = get_support_message()
         markup = types.InlineKeyboardMarkup()
         
-        # আপনার পাঠানো গ্রিন ২৪/৭ অ্যানিমেটেড ইমোজি আইডি দিয়ে বাটন
+        # তীর চিহ্ন সম্পূর্ণ বাদ দিয়ে সরাসরি কাস্টম ইমোজি বাটন
         try:
-            markup.add(types.InlineKeyboardButton("NEOX SUPPORT ↗", url=supp_link, icon_custom_emoji_id="5188635482174546097"))
+            markup.add(types.InlineKeyboardButton("NEOX SUPPORT", url=supp_link, icon_custom_emoji_id="5188635482174546097"))
         except:
-            markup.add(types.InlineKeyboardButton("🔄 24/7 NEOX SUPPORT ↗", url=supp_link))
+            markup.add(types.InlineKeyboardButton("24/7 NEOX SUPPORT", url=supp_link))
             
         bot.send_message(chat_id, supp_text, parse_mode="HTML", reply_markup=markup)
 
-    # 🌟 ৪টি অ্যানিমেটেড ইমোজিসহ ব্যালেন্স ও ১-ক্লিক কপি রেফারেল লিংক (অক্ষত) 🌟
+    # 🌟 ৪টি অ্যানিমেটেড ইমোজিসহ ব্যালেন্স ও ১-ক্লিক কপি রেফারেল লিংক 🌟
     elif "Balance" in text:
         bal, otps, _ = get_user(chat_id)
         bdt_val = int(bal * 120)
@@ -404,7 +404,7 @@ def handle_menu_and_emojis(message):
             msg = bot.send_message(chat_id, "💳 <b>আপনার পেমেন্ট তথ্য দিন:</b>\n\nবিকাশ / নগদ নম্বর অথবা Binance Pay ID লিখে পাঠান:", parse_mode="HTML", reply_markup=cancel_markup())
             bot.register_next_step_handler(msg, process_withdraw, bal)
 
-    # 🌟 ১০টি অ্যানিমেটেড ইমোজিসহ লাইভ ট্রাফিক (অক্ষত) 🌟
+    # 🌟 ১০টি অ্যানিমেটেড ইমোজিসহ লাইভ ট্রাফিক 🌟
     elif "Live Traffic" in text:
         live_msg = get_live_traffic_message()
         markup = types.InlineKeyboardMarkup()
@@ -450,7 +450,7 @@ def show_admin_panel(chat_id):
         f"👥 মোট ইউজার: <b>{total_users} জন</b>\n"
         f"📬 মোট ওটিপি সম্পন্ন: <b>{total_otps or 0} টি</b>\n"
         f"📱 পুলে সচল আসল নাম্বার: <b>{avail_num} টি</b>\n\n"
-        f"✨ <i>সাপোর্ট বাটনে গ্রিন ২৪/৭ আইকন সফলভাবে সেট হয়েছে!</i>"
+        f"✨ <i>বাটনে কোনো বড় তীর নেই, সম্পূর্ণ ক্লিন!</i>"
     )
     bot.send_message(chat_id, admin_text, reply_markup=markup, parse_mode="HTML")
 
@@ -500,7 +500,7 @@ def process_withdraw(message, balance):
         reply_markup=markup
     )
 
-# --- ইনলাইন বাটন হ্যান্ডলার (৩টি ফ্রেশ নাম্বার ও অটো-ডিলিট ইঞ্জিন অক্ষত) ---
+# --- ইনলাইন বাটন হ্যান্ডলার (৩টি ফ্রেশ নাম্বার ও অটো-ডিলিট ইঞ্জিন) ---
 @bot.callback_query_handler(func=lambda call: True)
 def callback_handler(call):
     chat_id = call.message.chat.id
@@ -568,7 +568,7 @@ def callback_handler(call):
                 markup.add(
                     types.InlineKeyboardButton("🔄 Change Number", callback_data=f"cnt_{country_tag}_{service}"),
                     types.InlineKeyboardButton("🌐 Change Country", callback_data=f"svc_{service}"),
-                    types.InlineKeyboardButton("📢 OTP Group ↗", url=otp_group_link)
+                    types.InlineKeyboardButton("📢 OTP Group", url=otp_group_link)
                 )
 
                 assigned_tpl = get_setting("msg_assigned", "📱 **{country} Number Assigned:**\n\n🌟 **Waiting For OTP:**")
@@ -802,5 +802,5 @@ def do_broadcast(message):
             pass
     bot.send_message(ADMIN_ID, "✅ ব্রডকাস্ট সম্পন্ন!", parse_mode="HTML")
 
-print("NEOX FAST SMS [Green 24/7 Support Custom Icon Active] চালু হয়েছে...")
+print("NEOX FAST SMS [Clean Support Button Online] চালু হয়েছে...")
 bot.infinity_polling()
