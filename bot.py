@@ -116,7 +116,6 @@ get_setting("otp_group", "https://t.me/jaazadmin")
 get_setting("min_withdraw", "0.50")
 get_setting("otp_rate", "0.010")
 
-get_setting("msg_welcome", "💖 <b>Welcome {name}!</b> 🎉\n\n🗣️ <b>Main Menu</b>\n\n📥 <b>Please select an option below:</b>")
 get_setting("msg_sel_service", "🚦 <b>Select a service:</b> 📥")
 get_setting("msg_sel_country", "🌍 <b>Select your country:</b> 📥")
 get_setting("msg_assigned", "📱 <b>{country} Number Assigned:</b>\n\n🌟 <b>Waiting For OTP:</b>")
@@ -193,12 +192,10 @@ def dispatch_otp_auto(num, code, full_msg=None):
         print(e)
     return False
 
-# 🌟 আপনার পাঠানো ৬টি অ্যানিমেটেড ইমোজি আইডি সরাসরি বাটনে সেট করা 🌟
+# 🌟 আপনার ৬টি বাটনে অ্যানিমেটেড কাস্টম ইমোজি সরাসরি যুক্ত (অক্ষত) 🌟
 def main_menu(user_id):
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
-    
     try:
-        # টেলিগ্রামের অফিসিয়াল কাস্টম ইমোজি আইডি দিয়ে বাটন তৈরি
         btn_get = types.KeyboardButton("Get Number", icon_custom_emoji_id="5947265786279104211")
         btn_cnt = types.KeyboardButton("Available Country", icon_custom_emoji_id="5363817109300200686")
         btn_sup = types.KeyboardButton("Support", icon_custom_emoji_id="5803071317401933205")
@@ -243,6 +240,7 @@ def country_menu(service):
     markup.add(types.InlineKeyboardButton("Back to Services", callback_data="back_to_services"))
     return markup
 
+# 👑 আপনার দেওয়া বর্ডার এবং ৪টি অ্যানিমেটেড ইমোজিসহ ভিআইপি ওয়েলকাম মেসেজ 👑
 @bot.message_handler(commands=['start'])
 def start_cmd(message):
     bot.clear_step_handler_by_chat_id(message.chat.id)
@@ -250,11 +248,26 @@ def start_cmd(message):
     ref_id = args[1].replace("ref_", "") if len(args) > 1 and "ref_" in args[1] else None
     get_user(message.chat.id, ref_id)
     
-    name = message.from_user.first_name
-    welc_tpl = get_setting("msg_welcome", "💖 <b>Welcome {name}!</b> 🎉\n\n🗣️ <b>Main Menu</b>\n\n📥 <b>Please select an option below:</b>")
-    welc_msg = welc_tpl.replace("{name}", name)
+    # আপনার পাঠানো ৪টি অ্যানিমেটেড ইমোজি কোড
+    e_crown = '<tg-emoji emoji-id="5353032893096567467">👑</tg-emoji>'
+    e_rocket = '<tg-emoji emoji-id="5352597830089347330">🚀</tg-emoji>'
+    e_badge = '<tg-emoji emoji-id="5352694861990501856">🛡️</tg-emoji>'
+    e_diamond = '<tg-emoji emoji-id="5352838545826420397">💎</tg-emoji>'
+
+    # হুবহু আপনার পাঠানো ফ্রেম ও ডিজাইনের ওয়েলকাম মেসেজ
+    welcome_box_text = (
+        f"╔═════════════════════╗\n"
+        f"   {e_crown} ⚡ <b>NEOX FAST SMS</b>\n"
+        f"╚═════════════════════╝\n"
+        f"{e_rocket} <b>Welcome to Number & OTP Service</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"{e_badge} <b>Choose an option below</b>\n"
+        f"<b>to continue using the bot.</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"{e_diamond} <b>Premium OTP Service</b>"
+    )
     
-    bot.send_message(message.chat.id, welc_msg, parse_mode="HTML", reply_markup=main_menu(message.chat.id))
+    bot.send_message(message.chat.id, welcome_box_text, parse_mode="HTML", reply_markup=main_menu(message.chat.id))
 
 @bot.message_handler(commands=['otp'])
 def admin_manual_otp(message):
@@ -378,20 +391,19 @@ def show_admin_panel(chat_id):
         f"👥 মোট ইউজার: <b>{total_users} জন</b>\n"
         f"📬 মোট ওটিপি সম্পন্ন: <b>{total_otps or 0} টি</b>\n"
         f"📱 পুলে সচল আসল নাম্বার: <b>{avail_num} টি</b>\n\n"
-        f"✨ <i>বাটনে আপনার ৬টি কাস্টম ইমোজি অফিশিয়ালভাবে লোড করা হয়েছে!</i>"
+        f"✨ <i>ভিআইপি ওয়েলকাম মেসেজ ও বাটনসমূহ সক্রিয়!</i>"
     )
     bot.send_message(chat_id, admin_text, reply_markup=markup, parse_mode="HTML")
 
 def edit_texts_menu(chat_id, message_id):
     markup = types.InlineKeyboardMarkup(row_width=1)
     markup.add(
-        types.InlineKeyboardButton("1. 💖 Welcome Message", callback_data="edt_msg_welcome"),
-        types.InlineKeyboardButton("2. 🚦 Select Service Text", callback_data="edt_msg_sel_service"),
-        types.InlineKeyboardButton("3. 🌍 Select Country Text", callback_data="edt_msg_sel_country"),
-        types.InlineKeyboardButton("4. 📱 Number Assigned Text", callback_data="edt_msg_assigned"),
-        types.InlineKeyboardButton("5. 🎧 Support Message", callback_data="edt_msg_support"),
-        types.InlineKeyboardButton("6. 🟢 Live Traffic Message", callback_data="edt_msg_traffic"),
-        types.InlineKeyboardButton("7. ⚠️ No Numbers Alert", callback_data="edt_msg_no_number"),
+        types.InlineKeyboardButton("1. 🚦 Select Service Text", callback_data="edt_msg_sel_service"),
+        types.InlineKeyboardButton("2. 🌍 Select Country Text", callback_data="edt_msg_sel_country"),
+        types.InlineKeyboardButton("3. 📱 Number Assigned Text", callback_data="edt_msg_assigned"),
+        types.InlineKeyboardButton("4. 🎧 Support Message", callback_data="edt_msg_support"),
+        types.InlineKeyboardButton("5. 🟢 Live Traffic Message", callback_data="edt_msg_traffic"),
+        types.InlineKeyboardButton("6. ⚠️ No Numbers Alert", callback_data="edt_msg_no_number"),
         types.InlineKeyboardButton("🔙 Back to Admin", callback_data="adm_back_main")
     )
     bot.edit_message_text(
@@ -429,6 +441,7 @@ def process_withdraw(message, balance):
         reply_markup=markup
     )
 
+# --- ইনলাইন বাটন হ্যান্ডলার (৩টি ফ্রেশ নাম্বার ও অটো-ডিলিট ইঞ্জিন) ---
 @bot.callback_query_handler(func=lambda call: True)
 def callback_handler(call):
     chat_id = call.message.chat.id
@@ -718,5 +731,5 @@ def do_broadcast(message):
             pass
     bot.send_message(ADMIN_ID, "✅ ব্রডকাস্ট সম্পন্ন!", parse_mode="HTML")
 
-print("NEOX FAST SMS [Official Custom Emoji Buttons Engine] চালু হয়েছে...")
+print("NEOX FAST SMS [VIP Animated Welcome Frame Online] চালু হয়েছে...")
 bot.infinity_polling()
