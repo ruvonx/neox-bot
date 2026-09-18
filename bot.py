@@ -110,21 +110,7 @@ def set_setting(key, val):
     cursor.execute("INSERT OR REPLACE INTO settings (key, val) VALUES (?, ?)", (key, str(val)))
     conn.commit()
 
-# আপনার নতুন ইমোজিসহ ৬টি বাটনের নাম
-BTN_GET_NUM = "☎️ Get Number"
-BTN_AVAIL_CNT = "🌍 Available Country"
-BTN_SUPPORT = "📡 Support"
-BTN_BALANCE = "💰 Balance"
-BTN_WITHDRAW = "😎 Withdraw"
-BTN_TRAFFIC = "🟢 Live Traffic"
-
-set_setting("btn_get_num", BTN_GET_NUM)
-set_setting("btn_avail_cnt", BTN_AVAIL_CNT)
-set_setting("btn_support", BTN_SUPPORT)
-set_setting("btn_balance", BTN_BALANCE)
-set_setting("btn_withdraw", BTN_WITHDRAW)
-set_setting("btn_traffic", BTN_TRAFFIC)
-
+# ডিফল্ট সেটিংস
 get_setting("support_link", "https://t.me/jaazadmin")
 get_setting("otp_group", "https://t.me/jaazadmin")
 get_setting("min_withdraw", "0.50")
@@ -207,19 +193,27 @@ def dispatch_otp_auto(num, code, full_msg=None):
         print(e)
     return False
 
-# --- ফার্স্ট পেজের বাটন মেনু ---
+# 🌟 আপনার পাঠানো ৬টি অ্যানিমেটেড ইমোজি আইডি সরাসরি বাটনে সেট করা 🌟
 def main_menu(user_id):
-    b_get = get_setting("btn_get_num", BTN_GET_NUM)
-    b_cnt = get_setting("btn_avail_cnt", BTN_AVAIL_CNT)
-    b_sup = get_setting("btn_support", BTN_SUPPORT)
-    b_bal = get_setting("btn_balance", BTN_BALANCE)
-    b_wit = get_setting("btn_withdraw", BTN_WITHDRAW)
-    b_trf = get_setting("btn_traffic", BTN_TRAFFIC)
-
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
-    markup.add(types.KeyboardButton(b_get), types.KeyboardButton(b_cnt))
-    markup.add(types.KeyboardButton(b_sup), types.KeyboardButton(b_bal))
-    markup.add(types.KeyboardButton(b_wit), types.KeyboardButton(b_trf))
+    
+    try:
+        # টেলিগ্রামের অফিসিয়াল কাস্টম ইমোজি আইডি দিয়ে বাটন তৈরি
+        btn_get = types.KeyboardButton("Get Number", icon_custom_emoji_id="5947265786279104211")
+        btn_cnt = types.KeyboardButton("Available Country", icon_custom_emoji_id="5363817109300200686")
+        btn_sup = types.KeyboardButton("Support", icon_custom_emoji_id="5803071317401933205")
+        btn_bal = types.KeyboardButton("Balance", icon_custom_emoji_id="6190336264940559752")
+        btn_wit = types.KeyboardButton("Withdraw", icon_custom_emoji_id="5300737719192795674")
+        btn_trf = types.KeyboardButton("Live Traffic", icon_custom_emoji_id="6314486714152784983")
+        
+        markup.add(btn_get, btn_cnt)
+        markup.add(btn_sup, btn_bal)
+        markup.add(btn_wit, btn_trf)
+    except Exception as e:
+        markup.add(types.KeyboardButton("☎️ Get Number"), types.KeyboardButton("🌍 Available Country"))
+        markup.add(types.KeyboardButton("📡 Support"), types.KeyboardButton("💰 Balance"))
+        markup.add(types.KeyboardButton("😎 Withdraw"), types.KeyboardButton("🟢 Live Traffic"))
+
     if user_id == ADMIN_ID:
         markup.add(types.KeyboardButton("⚙️ ADMIN PANEL"))
     return markup
@@ -249,7 +243,6 @@ def country_menu(service):
     markup.add(types.InlineKeyboardButton("Back to Services", callback_data="back_to_services"))
     return markup
 
-# 🌟 ফার্স্ট পেজ / স্টার্ট কমান্ড (একদম পরিচ্ছন্ন ও প্রফেশনাল) 🌟
 @bot.message_handler(commands=['start'])
 def start_cmd(message):
     bot.clear_step_handler_by_chat_id(message.chat.id)
@@ -289,21 +282,6 @@ def handle_menu_and_emojis(message):
     chat_id = message.chat.id
     text = message.text
 
-    # ইমোজি স্ক্যানার
-    if chat_id == ADMIN_ID and message.entities:
-        for entity in message.entities:
-            if entity.type == "custom_emoji":
-                emoji_id = entity.custom_emoji_id
-                info_text = (
-                    f"✨ <b>অ্যানিমেটেড ইমোজির তথ্য পাওয়া গেছে!</b>\n\n"
-                    f"🆔 <b>Emoji ID:</b> <code>{emoji_id}</code>\n\n"
-                    f"📋 <b>কোড:</b>\n"
-                    f"<code>&lt;tg-emoji emoji-id=\"{emoji_id}\"&gt;⭐&lt;/tg-emoji&gt;</code>"
-                )
-                bot.reply_to(message, info_text, parse_mode="HTML")
-                return
-
-    # কিওয়ার্ড ভিত্তিক নির্ভরযোগ্য হ্যান্ডলার
     if "Get Number" in text:
         msg_service = get_setting("msg_sel_service", "🚦 <b>Select a service:</b> 📥")
         bot.send_message(chat_id, msg_service, parse_mode="HTML", reply_markup=services_menu())
@@ -373,26 +351,25 @@ def show_admin_panel(chat_id):
     markup = types.InlineKeyboardMarkup(row_width=2)
     markup.add(
         types.InlineKeyboardButton("📝 Edit Bot Texts", callback_data="adm_menu_texts"),
-        types.InlineKeyboardButton("🔤 Rename Buttons", callback_data="adm_menu_btns")
+        types.InlineKeyboardButton("📂 Manage Services", callback_data="adm_mng_svc")
     )
     markup.add(
-        types.InlineKeyboardButton("📂 Manage Services", callback_data="adm_mng_svc"),
-        types.InlineKeyboardButton("🌐 Manage Countries", callback_data="adm_mng_cnt")
+        types.InlineKeyboardButton("🌐 Manage Countries", callback_data="adm_mng_cnt"),
+        types.InlineKeyboardButton("➕ Add Numbers", callback_data="adm_add_num")
     )
     markup.add(
-        types.InlineKeyboardButton("➕ Add Numbers", callback_data="adm_add_num"),
-        types.InlineKeyboardButton("📋 Number Pool", callback_data="adm_list_num")
+        types.InlineKeyboardButton("📋 Number Pool", callback_data="adm_list_num"),
+        types.InlineKeyboardButton("🎧 Support Link", callback_data="adm_set_supp")
     )
     markup.add(
-        types.InlineKeyboardButton("🎧 Support Link", callback_data="adm_set_supp"),
-        types.InlineKeyboardButton("📢 OTP Group Link", callback_data="adm_set_group")
+        types.InlineKeyboardButton("📢 OTP Group Link", callback_data="adm_set_group"),
+        types.InlineKeyboardButton("💵 Min Withdraw", callback_data="adm_set_minw")
     )
     markup.add(
-        types.InlineKeyboardButton("💵 Min Withdraw", callback_data="adm_set_minw"),
-        types.InlineKeyboardButton("🎁 Set OTP Rate", callback_data="adm_set_rate")
+        types.InlineKeyboardButton("🎁 Set OTP Rate", callback_data="adm_set_rate"),
+        types.InlineKeyboardButton("➕ Add/Cut Bal", callback_data="adm_addbal")
     )
     markup.add(
-        types.InlineKeyboardButton("➕ Add/Cut Bal", callback_data="adm_addbal"),
         types.InlineKeyboardButton("📢 Broadcast", callback_data="adm_broadcast")
     )
 
@@ -401,7 +378,7 @@ def show_admin_panel(chat_id):
         f"👥 মোট ইউজার: <b>{total_users} জন</b>\n"
         f"📬 মোট ওটিপি সম্পন্ন: <b>{total_otps or 0} টি</b>\n"
         f"📱 পুলে সচল আসল নাম্বার: <b>{avail_num} টি</b>\n\n"
-        f"⚡ <i>বাটনে নতুন ইমোজি ও ফ্রেশ ডিজাইন সক্রিয়!</i>"
+        f"✨ <i>বাটনে আপনার ৬টি কাস্টম ইমোজি অফিশিয়ালভাবে লোড করা হয়েছে!</i>"
     )
     bot.send_message(chat_id, admin_text, reply_markup=markup, parse_mode="HTML")
 
@@ -620,17 +597,6 @@ def callback_handler(call):
         bot.answer_callback_query(call.id)
         show_admin_panel(chat_id)
 
-    elif call.data == "adm_menu_btns" and chat_id == ADMIN_ID:
-        bot.answer_callback_query(call.id)
-        rename_buttons_menu(chat_id, message_id)
-
-    elif call.data.startswith("rnb_") and chat_id == ADMIN_ID:
-        btn_key = call.data.replace("rnb_", "")
-        bot.answer_callback_query(call.id)
-        current_name = get_setting(btn_key, "Button")
-        msg = bot.send_message(chat_id, f"✏️ বর্তমান নাম: <code>{current_name}</code>\n\nনতুন নাম ও ইমোজি লিখে পাঠান:", parse_mode="HTML", reply_markup=cancel_markup())
-        bot.register_next_step_handler(msg, lambda m: save_btn_and_notify(m, btn_key))
-
     elif call.data == "adm_add_num" and chat_id == ADMIN_ID:
         bot.answer_callback_query(call.id)
         msg = bot.send_message(chat_id, "📱 দেশ ও নাম্বার পাঠান:\n<code>দেশ নম্বর১ নম্বর২</code>\nউদাহরণ: <code>Benin +229656201 +229656202</code>", parse_mode="HTML", reply_markup=cancel_markup())
@@ -667,23 +633,6 @@ def callback_handler(call):
         bot.answer_callback_query(call.id)
         msg = bot.send_message(chat_id, "🎁 প্রতি ওটিপির রেট (ডলারে):", parse_mode="HTML", reply_markup=cancel_markup())
         bot.register_next_step_handler(msg, lambda m: save_setting_and_notify(m, "otp_rate", "প্রতি ওটিপির রেট"))
-
-def rename_buttons_menu(chat_id, message_id):
-    markup = types.InlineKeyboardMarkup(row_width=2)
-    markup.add(
-        types.InlineKeyboardButton("1. Get Number বাটন", callback_data="rnb_btn_get_num"),
-        types.InlineKeyboardButton("2. Available Country বাটন", callback_data="rnb_btn_avail_cnt")
-    )
-    markup.add(
-        types.InlineKeyboardButton("3. Support বাটন", callback_data="rnb_btn_support"),
-        types.InlineKeyboardButton("4. Balance বাটন", callback_data="rnb_btn_balance")
-    )
-    markup.add(
-        types.InlineKeyboardButton("5. Withdraw বাটন", callback_data="rnb_btn_withdraw"),
-        types.InlineKeyboardButton("6. Live Traffic বাটন", callback_data="rnb_btn_traffic")
-    )
-    markup.add(types.InlineKeyboardButton("🔙 Back to Admin", callback_data="adm_back_main"))
-    bot.edit_message_text("🔤 <b>কোন বাটনের নাম পরিবর্তন করতে চান?</b>", chat_id, message_id, parse_mode="HTML", reply_markup=markup)
 
 def save_text_and_notify(message, txt_key):
     if message.text in ["/cancel", "cancel", "বাতিল"]:
@@ -732,13 +681,6 @@ def do_del_country(message):
     conn.commit()
     bot.send_message(ADMIN_ID, f"✅ সফলভাবে <b>{c_tag}</b> দেশের বাটন মুছে ফেলা হয়েছে!", parse_mode="HTML")
 
-def save_btn_and_notify(message, btn_key):
-    if message.text in ["/cancel", "cancel", "বাতিল"]:
-        return
-    new_title = message.text.strip()
-    set_setting(btn_key, new_title)
-    bot.send_message(ADMIN_ID, f"✅ বাটনের নাম আপডেট হয়ে <b><code>{new_title}</code></b> হয়েছে!", parse_mode="HTML", reply_markup=main_menu(ADMIN_ID))
-
 def save_setting_and_notify(message, key, name):
     if message.text in ["/cancel", "cancel", "বাতিল"]:
         return
@@ -776,5 +718,5 @@ def do_broadcast(message):
             pass
     bot.send_message(ADMIN_ID, "✅ ব্রডকাস্ট সম্পন্ন!", parse_mode="HTML")
 
-print("NEOX FAST SMS [Clean Message & VIP Buttons Active] চালু হয়েছে...")
+print("NEOX FAST SMS [Official Custom Emoji Buttons Engine] চালু হয়েছে...")
 bot.infinity_polling()
