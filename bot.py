@@ -4,7 +4,7 @@ import sqlite3
 import time
 import os
 from urllib.parse import urlparse, parse_qs
-from threading import Thread
+from threading import Thread, Lock
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
 # --- Render 24/7 Web Server ---
@@ -41,76 +41,82 @@ def run_server():
 Thread(target=run_server, daemon=True).start()
 
 # --- Bot Configuration ---
-BOT_TOKEN = "8843310193:AAH9ViXDNIi94hQnuZLjmiLe3UhtaaUM77U"
-ADMIN_ID = 7241161752
-BOT_USERNAME = "neoxfastsms_bot"
+BOT_TOKEN = os.environ.get("BOT_TOKEN", "8843310193:AAH9ViXDNIi94hQnuZLjmiLe3UhtaaUM77U")
+ADMIN_ID = int(os.environ.get("ADMIN_ID", 7241161752))
+BOT_USERNAME = os.environ.get("BOT_USERNAME", "neoxfastsms_bot")
 
 bot = telebot.TeleBot(BOT_TOKEN)
 
+# থ্রেড-সেফটি লক
+db_lock = Lock()
 conn = sqlite3.connect("bot_users.db", check_same_thread=False)
 cursor = conn.cursor()
 
-# টেবিলসমূহ
-cursor.execute('''CREATE TABLE IF NOT EXISTS users (
-    user_id INTEGER PRIMARY KEY, balance REAL DEFAULT 0.0, total_otp INTEGER DEFAULT 0, referrer INTEGER DEFAULT NULL
-)''')
+# টেবিলসমূহ তৈরি
+with db_lock:
+    cursor.execute('''CREATE TABLE IF NOT EXISTS users (
+        user_id INTEGER PRIMARY KEY, balance REAL DEFAULT 0.0, total_otp INTEGER DEFAULT 0, referrer INTEGER DEFAULT NULL
+    )''')
 
-cursor.execute('''CREATE TABLE IF NOT EXISTS withdrawals (
-    id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, amount REAL, method_details TEXT, status TEXT DEFAULT 'PENDING'
-)''')
+    cursor.execute('''CREATE TABLE IF NOT EXISTS withdrawals (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, amount REAL, method_details TEXT, status TEXT DEFAULT 'PENDING'
+    )''')
 
-cursor.execute('''CREATE TABLE IF NOT EXISTS numbers (
-    id INTEGER PRIMARY KEY AUTOINCREMENT, country TEXT, number TEXT UNIQUE, status TEXT DEFAULT 'AVAILABLE', assigned_user INTEGER DEFAULT NULL, assigned_service TEXT DEFAULT 'FACEBOOK'
-)''')
+    cursor.execute('''CREATE TABLE IF NOT EXISTS numbers (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, country TEXT, number TEXT UNIQUE, status TEXT DEFAULT 'AVAILABLE', assigned_user INTEGER DEFAULT NULL, assigned_service TEXT DEFAULT 'FACEBOOK'
+    )''')
 
-cursor.execute('''CREATE TABLE IF NOT EXISTS settings (
-    key TEXT PRIMARY KEY, val TEXT
-)''')
+    cursor.execute('''CREATE TABLE IF NOT EXISTS settings (
+        key TEXT PRIMARY KEY, val TEXT
+    )''')
 
-cursor.execute('''CREATE TABLE IF NOT EXISTS services (
-    id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE
-)''')
+    cursor.execute('''CREATE TABLE IF NOT EXISTS services (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE
+    )''')
 
-cursor.execute('''CREATE TABLE IF NOT EXISTS countries (
-    id INTEGER PRIMARY KEY AUTOINCREMENT, service_name TEXT, display_name TEXT, country_tag TEXT
-)''')
-conn.commit()
+    cursor.execute('''CREATE TABLE IF NOT EXISTS countries (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, service_name TEXT, display_name TEXT, country_tag TEXT
+    )''')
+    conn.commit()
 
 # ডিফল্ট সার্ভিস ও কান্ট্রি
-cursor.execute("SELECT COUNT(*) FROM services")
-if cursor.fetchone()[0] == 0:
-    for s in ["FACEBOOK", "FB NEW CREATE", "TIKTOK"]:
-        cursor.execute("INSERT OR IGNORE INTO services (name) VALUES (?)", (s,))
-    
-    default_countries = [
-        ("FACEBOOK", "🇧🇯 Benin 638 🔥 (450)", "Benin"),
-        ("FACEBOOK", "🇸🇩 Sudan FB 🔥 (874)", "Sudan"),
-        ("FACEBOOK", "🇪🇬 Egypt S1 (9719)", "Egypt"),
-        ("FACEBOOK", "🇲🇲 Myanmar Top (1166)", "Myanmar"),
-        ("FACEBOOK", "🇧🇫 Burkina Faso (1792)", "Burkina"),
-        ("FB NEW CREATE", "🇧🇯 Benin 638 🔥 (450)", "Benin"),
-        ("FB NEW CREATE", "🇮🇹 Italy New FB (520)", "Italy"),
-        ("TIKTOK", "🇳🇴 Norway TT (2547)", "Norway"),
-        ("TIKTOK", "🇳🇵 Nepal TikTok (1752)", "Nepal")
-    ]
-    for s_name, d_name, c_tag in default_countries:
-        cursor.execute("INSERT INTO countries (service_name, display_name, country_tag) VALUES (?, ?, ?)", (s_name, d_name, c_tag))
-    conn.commit()
+with db_lock:
+    cursor.execute("SELECT COUNT(*) FROM services")
+    if cursor.fetchone()[0] == 0:
+        for s in ["FACEBOOK", "FB NEW CREATE", "TIKTOK"]:
+            cursor.execute("INSERT OR IGNORE INTO services (name) VALUES (?)", (s,))
+        
+        default_countries = [
+            ("FACEBOOK", "🇧🇯 Benin 638 🔥 (450)", "Benin"),
+            ("FACEBOOK", "🇸🇩 Sudan FB 🔥 (874)", "Sudan"),
+            ("FACEBOOK", "🇪🇬 Egypt S1 (9719)", "Egypt"),
+            ("FACEBOOK", "🇲🇲 Myanmar Top (1166)", "Myanmar"),
+            ("FACEBOOK", "🇧🇫 Burkina Faso (1792)", "Burkina"),
+            ("FB NEW CREATE", "🇧🇯 Benin 638 🔥 (450)", "Benin"),
+            ("FB NEW CREATE", "🇮🇹 Italy New FB (520)", "Italy"),
+            ("TIKTOK", "🇳🇴 Norway TT (2547)", "Norway"),
+            ("TIKTOK", "🇳🇵 Nepal TikTok (1752)", "Nepal")
+        ]
+        for s_name, d_name, c_tag in default_countries:
+            cursor.execute("INSERT INTO countries (service_name, display_name, country_tag) VALUES (?, ?, ?)", (s_name, d_name, c_tag))
+        conn.commit()
 
 def get_setting(key, default_val):
-    cursor.execute("SELECT val FROM settings WHERE key = ?", (key,))
-    row = cursor.fetchone()
-    if row:
-        return row[0]
-    cursor.execute("INSERT OR REPLACE INTO settings (key, val) VALUES (?, ?)", (key, str(default_val)))
-    conn.commit()
-    return str(default_val)
+    with db_lock:
+        cursor.execute("SELECT val FROM settings WHERE key = ?", (key,))
+        row = cursor.fetchone()
+        if row:
+            return row[0]
+        cursor.execute("INSERT OR REPLACE INTO settings (key, val) VALUES (?, ?)", (key, str(default_val)))
+        conn.commit()
+        return str(default_val)
 
 def set_setting(key, val):
-    cursor.execute("INSERT OR REPLACE INTO settings (key, val) VALUES (?, ?)", (key, str(val)))
-    conn.commit()
+    with db_lock:
+        cursor.execute("INSERT OR REPLACE INTO settings (key, val) VALUES (?, ?)", (key, str(val)))
+        conn.commit()
 
-# ডিফল্ট সেটিংস
+# ডিফল্ট সেটিংস লোড
 get_setting("support_link", "https://t.me/jaazadmin")
 get_setting("otp_group", "https://t.me/jaazadmin")
 get_setting("min_withdraw", "0.50")
@@ -121,7 +127,6 @@ get_setting("msg_sel_country", "🌍 <b>Select your country:</b> 📥")
 get_setting("msg_assigned", "📱 <b>{country} Number Assigned:</b>\n\n🌟 <b>Waiting For OTP:</b>")
 get_setting("msg_no_number", "⚠️ <b>দুঃখিত! বর্তমানে {country} দেশের কোনো চালু নাম্বার খালি নেই।</b>\n\nদয়া করে অন্য কোনো দেশ নির্বাচন করুন অথবা অ্যাডমিনকে নাম্বার লোড করতে বলুন।")
 
-# 🌟 সাপোর্ট মেসেজ 🌟
 def get_support_message():
     custom = get_setting("msg_support_custom", "")
     if custom:
@@ -135,7 +140,6 @@ def get_support_message():
         f"{e_arrow} <b>All Time Available</b>"
     )
 
-# 🌟 লাইভ ট্রাফিকের মেসেজ 🌟
 def get_live_traffic_message():
     custom_saved = get_setting("msg_traffic_custom", "")
     if custom_saved:
@@ -177,28 +181,42 @@ def make_copy_btn(num_str):
     return types.InlineKeyboardButton(f"📞  {num_clean}", callback_data=f"copy_{num_clean}")
 
 def get_user(user_id, ref_id=None):
-    cursor.execute("SELECT balance, total_otp, referrer FROM users WHERE user_id = ?", (user_id,))
-    row = cursor.fetchone()
-    if not row:
-        ref = int(ref_id) if ref_id and str(ref_id).isdigit() and int(ref_id) != user_id else None
-        cursor.execute("INSERT INTO users (user_id, balance, total_otp, referrer) VALUES (?, 0.0, 0, ?)", (user_id, ref))
-        conn.commit()
-        return (0.0, 0, ref)
-    return row
+    with db_lock:
+        cursor.execute("SELECT balance, total_otp, referrer FROM users WHERE user_id = ?", (user_id,))
+        row = cursor.fetchone()
+        if not row:
+            ref = int(ref_id) if ref_id and str(ref_id).isdigit() and int(ref_id) != user_id else None
+            cursor.execute("INSERT INTO users (user_id, balance, total_otp, referrer) VALUES (?, 0.0, 0, ?)", (user_id, ref))
+            conn.commit()
+            return (0.0, 0, ref)
+        return row
 
 def update_balance(user_id, amount, otp_inc=0):
-    bal, otps, _ = get_user(user_id)
-    new_bal = max(0.0, bal + amount)
-    new_otps = otps + otp_inc
-    cursor.execute("UPDATE users SET balance = ?, total_otp = ? WHERE user_id = ?", (new_bal, new_otps, user_id))
-    conn.commit()
-    return new_bal
+    with db_lock:
+        bal, otps, ref = get_user(user_id)
+        new_bal = max(0.0, bal + amount)
+        new_otps = otps + otp_inc
+        cursor.execute("UPDATE users SET balance = ?, total_otp = ? WHERE user_id = ?", (new_bal, new_otps, user_id))
+        conn.commit()
+
+        # ১০টি ওটিপি সম্পন্ন হলে রেফারেল বোনাস প্রদান লজিক
+        if otp_inc > 0 and new_otps == 10 and ref:
+            cursor.execute("UPDATE users SET balance = balance + 0.10 WHERE user_id = ?", (ref,))
+            conn.commit()
+            try:
+                bot.send_message(ref, "🎉 <b>অভিনন্দন!</b> আপনার একজন রেফারেল ১০টি OTP সফলভাবে সম্পন্ন করায় আপনি <b>$0.1000</b> রেফার বোনাস পেয়েছেন!", parse_mode="HTML")
+            except:
+                pass
+
+        return new_bal
 
 def dispatch_otp_auto(num, code, full_msg=None):
     try:
         clean_num = num.strip().replace(" ", "").replace("-", "")
-        cursor.execute("SELECT assigned_user, assigned_service FROM numbers WHERE number LIKE ? AND status = 'ASSIGNED'", (f"%{clean_num[-8:]}%",))
-        res = cursor.fetchone()
+        with db_lock:
+            cursor.execute("SELECT assigned_user, assigned_service FROM numbers WHERE number LIKE ? AND status = 'ASSIGNED'", (f"%{clean_num[-8:]}%",))
+            res = cursor.fetchone()
+
         if res and res[0]:
             target_user = res[0]
             service_name = res[1] if res[1] else "FACEBOOK"
@@ -206,8 +224,9 @@ def dispatch_otp_auto(num, code, full_msg=None):
             new_bal = update_balance(target_user, otp_rate, otp_inc=1)
             bdt_earned = otp_rate * 120
 
-            cursor.execute("DELETE FROM numbers WHERE number LIKE ?", (f"%{clean_num[-8:]}%",))
-            conn.commit()
+            with db_lock:
+                cursor.execute("DELETE FROM numbers WHERE number LIKE ?", (f"%{clean_num[-8:]}%",))
+                conn.commit()
 
             if not full_msg:
                 full_msg = f"<#> {code} est votre code {service_name} H29Q+Fsn4Sr"
@@ -221,17 +240,16 @@ def dispatch_otp_auto(num, code, full_msg=None):
                 f"<pre><code class=\"language-powershell\">{full_msg}</code></pre>\n\n"
                 f"🛠 <b>Service:</b> {service_name}\n"
                 f"📲 <b>Number:</b> <code>{clean_num}</code>\n"
-                f"💸 <b>Earned:</b> ৳0.200"
+                f"💸 <b>Earned:</b> ৳{bdt_earned:.2f} (${otp_rate:.3f})"
             )
 
             bot.send_message(target_user, otp_text, parse_mode="HTML")
             bot.send_message(ADMIN_ID, f"⚡ <b>[Auto-OTP]</b> ইউজার <code>{target_user}</code> ওটিপি পেয়েছে!\n📲 <code>{clean_num}</code> | 🔑 <code>{code}</code>", parse_mode="HTML")
             return True
     except Exception as e:
-        print(e)
+        print("Dispatch error:", e)
     return False
 
-# 🌟 আপনার ৬টি বাটনে অ্যানিমেটেড কাস্টম ইমোজি সরাসরি যুক্ত 🌟
 def main_menu(user_id):
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
     try:
@@ -245,7 +263,7 @@ def main_menu(user_id):
         markup.add(btn_get, btn_cnt)
         markup.add(btn_sup, btn_bal)
         markup.add(btn_wit, btn_trf)
-    except Exception as e:
+    except Exception:
         markup.add(types.KeyboardButton("☎️ Get Number"), types.KeyboardButton("🌍 Available Country"))
         markup.add(types.KeyboardButton("📡 Support"), types.KeyboardButton("💰 Balance"))
         markup.add(types.KeyboardButton("😎 Withdraw"), types.KeyboardButton("🟢 Live Traffic"))
@@ -255,16 +273,18 @@ def main_menu(user_id):
     return markup
 
 def services_menu():
-    cursor.execute("SELECT name FROM services")
-    svcs = cursor.fetchall()
+    with db_lock:
+        cursor.execute("SELECT name FROM services")
+        svcs = cursor.fetchall()
     markup = types.InlineKeyboardMarkup(row_width=1)
     for (name,) in svcs:
         markup.add(types.InlineKeyboardButton(name, callback_data=f"svc_{name}"))
     return markup
 
 def country_menu(service):
-    cursor.execute("SELECT display_name, country_tag FROM countries WHERE service_name = ?", (service,))
-    rows = cursor.fetchall()
+    with db_lock:
+        cursor.execute("SELECT display_name, country_tag FROM countries WHERE service_name = ?", (service,))
+        rows = cursor.fetchall()
     markup = types.InlineKeyboardMarkup(row_width=2)
     buttons = []
     for d_name, c_tag in rows:
@@ -276,10 +296,9 @@ def country_menu(service):
         else:
             markup.add(buttons[i])
 
-    markup.add(types.InlineKeyboardButton("Back to Services", callback_data="back_to_services"))
+    markup.add(types.InlineKeyboardButton("🔙 Back to Services", callback_data="back_to_services"))
     return markup
 
-# 👑 ৪টি অ্যানিমেটেড ইমোজিসহ ওয়েলকাম ফ্রেম 👑
 @bot.message_handler(commands=['start'])
 def start_cmd(message):
     bot.clear_step_handler_by_chat_id(message.chat.id)
@@ -303,7 +322,6 @@ def start_cmd(message):
         f"━━━━━━━━━━━━━━━━━━━━\n"
         f"{e_diamond} <b>Premium OTP Service</b>"
     )
-    
     bot.send_message(message.chat.id, welcome_box_text, parse_mode="HTML", reply_markup=main_menu(message.chat.id))
 
 @bot.message_handler(commands=['otp'])
@@ -337,8 +355,9 @@ def handle_menu_and_emojis(message):
         bot.send_message(chat_id, msg_service, parse_mode="HTML", reply_markup=services_menu())
 
     elif "Available Country" in text:
-        cursor.execute("SELECT country, COUNT(*) FROM numbers WHERE status = 'AVAILABLE' GROUP BY country")
-        counts = cursor.fetchall()
+        with db_lock:
+            cursor.execute("SELECT country, COUNT(*) FROM numbers WHERE status = 'AVAILABLE' GROUP BY country")
+            counts = cursor.fetchall()
         c_text = "🌍 <b>Available Countries & Numbers:</b>\n\n"
         if counts:
             for country, cnt in counts:
@@ -347,27 +366,24 @@ def handle_menu_and_emojis(message):
             c_text += "বর্তমানে পুলে কোনো নাম্বার খালি নেই।"
         bot.send_message(chat_id, c_text, parse_mode="HTML")
 
-    # 🌟 সাপোর্ট মেসেজ (কোনো তীর বা নীল বক্স ছাড়া একদম পরিচ্ছন্ন) 🌟
     elif "Support" in text:
         supp_link = get_setting("support_link", "https://t.me/jaazadmin")
         supp_text = get_support_message()
         markup = types.InlineKeyboardMarkup()
-        
-        # তীর চিহ্ন সম্পূর্ণ বাদ দিয়ে সরাসরি কাস্টম ইমোজি বাটন
         try:
             markup.add(types.InlineKeyboardButton("NEOX SUPPORT", url=supp_link, icon_custom_emoji_id="5188635482174546097"))
         except:
             markup.add(types.InlineKeyboardButton("24/7 NEOX SUPPORT", url=supp_link))
-            
         bot.send_message(chat_id, supp_text, parse_mode="HTML", reply_markup=markup)
 
-    # 🌟 ৪টি অ্যানিমেটেড ইমোজিসহ ব্যালেন্স ও ১-ক্লিক কপি রেফারেল লিংক 🌟
     elif "Balance" in text:
         bal, otps, _ = get_user(chat_id)
         bdt_val = int(bal * 120)
         
-        cursor.execute("SELECT COUNT(*) FROM users WHERE referrer = ?", (chat_id,))
-        ref_count = cursor.fetchone()[0]
+        with db_lock:
+            # ১০টি ওটিপি পূরণকারী কনফার্ম রেফারেল গণনা
+            cursor.execute("SELECT COUNT(*) FROM users WHERE referrer = ? AND total_otp >= 10", (chat_id,))
+            ref_count = cursor.fetchone()[0]
 
         e_bal = '<tg-emoji emoji-id="6275881112849880302">😎</tg-emoji>'
         e_link = '<tg-emoji emoji-id="5942904397313873606">💬</tg-emoji>'
@@ -399,12 +415,11 @@ def handle_menu_and_emojis(message):
         bal, _, _ = get_user(chat_id)
         min_w = float(get_setting("min_withdraw", "0.50"))
         if bal < min_w:
-            bot.send_message(chat_id, f"❌ <b>You need at least ${min_w:.4f} to withdraw.</b>", parse_mode="HTML")
+            bot.send_message(chat_id, f"❌ <b>You need at least ${min_w:.4f} to withdraw.</b>\nYour current balance: ${bal:.4f}", parse_mode="HTML")
         else:
             msg = bot.send_message(chat_id, "💳 <b>আপনার পেমেন্ট তথ্য দিন:</b>\n\nবিকাশ / নগদ নম্বর অথবা Binance Pay ID লিখে পাঠান:", parse_mode="HTML", reply_markup=cancel_markup())
             bot.register_next_step_handler(msg, process_withdraw, bal)
 
-    # 🌟 ১০টি অ্যানিমেটেড ইমোজিসহ লাইভ ট্রাফিক 🌟
     elif "Live Traffic" in text:
         live_msg = get_live_traffic_message()
         markup = types.InlineKeyboardMarkup()
@@ -415,10 +430,15 @@ def handle_menu_and_emojis(message):
         show_admin_panel(chat_id)
 
 def show_admin_panel(chat_id):
-    cursor.execute("SELECT COUNT(*), SUM(balance), SUM(total_otp) FROM users")
-    total_users, total_bal, total_otps = cursor.fetchone()
-    cursor.execute("SELECT COUNT(*) FROM numbers WHERE status = 'AVAILABLE'")
-    avail_num = cursor.fetchone()[0]
+    with db_lock:
+        cursor.execute("SELECT COUNT(*), SUM(balance), SUM(total_otp) FROM users")
+        stats = cursor.fetchone()
+        total_users = stats[0] or 0
+        total_bal = stats[1] or 0.0
+        total_otps = stats[2] or 0
+
+        cursor.execute("SELECT COUNT(*) FROM numbers WHERE status = 'AVAILABLE'")
+        avail_num = cursor.fetchone()[0]
 
     markup = types.InlineKeyboardMarkup(row_width=2)
     markup.add(
@@ -448,9 +468,9 @@ def show_admin_panel(chat_id):
     admin_text = (
         f"👑 <b>A-Z FULL DYNAMIC CONTROL PANEL</b> 👑\n\n"
         f"👥 মোট ইউজার: <b>{total_users} জন</b>\n"
-        f"📬 মোট ওটিপি সম্পন্ন: <b>{total_otps or 0} টি</b>\n"
-        f"📱 পুলে সচল আসল নাম্বার: <b>{avail_num} টি</b>\n\n"
-        f"✨ <i>বাটনে কোনো বড় তীর নেই, সম্পূর্ণ ক্লিন!</i>"
+        f"💰 মোট ইউজার ফান্ড: <b>${total_bal:.3f}</b>\n"
+        f"📬 মোট ওটিপি সম্পন্ন: <b>{total_otps} টি</b>\n"
+        f"📱 পুলে সচল আসল নাম্বার: <b>{avail_num} টি</b>\n"
     )
     bot.send_message(chat_id, admin_text, reply_markup=markup, parse_mode="HTML")
 
@@ -477,10 +497,12 @@ def process_withdraw(message, balance):
     chat_id = message.chat.id
     details = message.text
     update_balance(chat_id, -balance)
-    cursor.execute("INSERT INTO withdrawals (user_id, amount, method_details, status) VALUES (?, ?, ?, 'PENDING')",
-                   (chat_id, balance, details))
-    w_id = cursor.lastrowid
-    conn.commit()
+    
+    with db_lock:
+        cursor.execute("INSERT INTO withdrawals (user_id, amount, method_details, status) VALUES (?, ?, ?, 'PENDING')",
+                       (chat_id, balance, details))
+        w_id = cursor.lastrowid
+        conn.commit()
 
     bot.send_message(chat_id, "✅ <b>উইথড্র রিকোয়েস্ট সফল হয়েছে!</b>\nঅ্যাডমিন যাচাই করে পেমেন্ট পাঠিয়ে দেবেন।", parse_mode="HTML")
 
@@ -500,7 +522,6 @@ def process_withdraw(message, balance):
         reply_markup=markup
     )
 
-# --- ইনলাইন বাটন হ্যান্ডলার (৩টি ফ্রেশ নাম্বার ও অটো-ডিলিট ইঞ্জিন) ---
 @bot.callback_query_handler(func=lambda call: True)
 def callback_handler(call):
     chat_id = call.message.chat.id
@@ -543,46 +564,49 @@ def callback_handler(call):
         bot.answer_callback_query(call.id)
 
         try:
-            cursor.execute("DELETE FROM numbers WHERE assigned_user = ?", (chat_id,))
-            conn.commit()
-
-            cursor.execute(
-                "SELECT id, number FROM numbers WHERE status = 'AVAILABLE' AND (country LIKE ? OR country = ?) ORDER BY id ASC LIMIT 3", 
-                (f"%{country_tag}%", country_tag)
-            )
-            rows = cursor.fetchall()
-            
-            if rows:
-                assigned_numbers = []
-                for num_id, num in rows:
-                    cursor.execute("UPDATE numbers SET status = 'ASSIGNED', assigned_user = ?, assigned_service = ? WHERE id = ?", (chat_id, num_id, service))
-                    assigned_numbers.append(num)
-                conn.commit()
-
-                otp_group_link = get_setting("otp_group", "https://t.me/jaazadmin")
-                markup = types.InlineKeyboardMarkup(row_width=1)
-
-                for num in assigned_numbers:
-                    markup.add(make_copy_btn(num))
-
-                markup.add(
-                    types.InlineKeyboardButton("🔄 Change Number", callback_data=f"cnt_{country_tag}_{service}"),
-                    types.InlineKeyboardButton("🌐 Change Country", callback_data=f"svc_{service}"),
-                    types.InlineKeyboardButton("📢 OTP Group", url=otp_group_link)
-                )
-
-                assigned_tpl = get_setting("msg_assigned", "📱 **{country} Number Assigned:**\n\n🌟 **Waiting For OTP:**")
-                assigned_msg = assigned_tpl.replace("{country}", country_tag)
+            with db_lock:
+                # আগের পুলে থাকা অ্যাসাইন বাতিল করা
+                cursor.execute("UPDATE numbers SET status = 'AVAILABLE', assigned_user = NULL WHERE assigned_user = ?", (chat_id,))
                 
-                bot.edit_message_text(chat_id=chat_id, message_id=message_id, text=assigned_msg, parse_mode="HTML", reply_markup=markup)
-            else:
-                markup = types.InlineKeyboardMarkup()
-                markup.add(types.InlineKeyboardButton("🔙 Choose Another Country", callback_data=f"svc_{service}"))
-                no_num_tpl = get_setting("msg_no_number", "⚠️ **দুঃখিত! বর্তমানে {country} দেশের কোনো চালু নাম্বার খালি নেই।**")
-                no_num_msg = no_num_tpl.replace("{country}", country_tag)
-                bot.edit_message_text(chat_id=chat_id, message_id=message_id, text=no_num_msg, parse_mode="HTML", reply_markup=markup)
+                # সর্বোচ্চ ৩টি নাম্বার তোলা
+                cursor.execute(
+                    "SELECT id, number FROM numbers WHERE status = 'AVAILABLE' AND (country LIKE ? OR country = ?) ORDER BY id ASC LIMIT 3", 
+                    (f"%{country_tag}%", country_tag)
+                )
+                rows = cursor.fetchall()
+                
+                if rows:
+                    assigned_numbers = []
+                    for num_id, num in rows:
+                        # বাগ ফিক্স: প্যারামিটারের সঠিক ক্রম (assigned_user, assigned_service, id)
+                        cursor.execute("UPDATE numbers SET status = 'ASSIGNED', assigned_user = ?, assigned_service = ? WHERE id = ?", (chat_id, service, num_id))
+                        assigned_numbers.append(num)
+                    conn.commit()
+
+                    otp_group_link = get_setting("otp_group", "https://t.me/jaazadmin")
+                    markup = types.InlineKeyboardMarkup(row_width=1)
+
+                    for num in assigned_numbers:
+                        markup.add(make_copy_btn(num))
+
+                    markup.add(
+                        types.InlineKeyboardButton("🔄 Change Number", callback_data=f"cnt_{country_tag}_{service}"),
+                        types.InlineKeyboardButton("🌐 Change Country", callback_data=f"svc_{service}"),
+                        types.InlineKeyboardButton("📢 OTP Group", url=otp_group_link)
+                    )
+
+                    assigned_tpl = get_setting("msg_assigned", "📱 <b>{country} Number Assigned:</b>\n\n🌟 <b>Waiting For OTP:</b>")
+                    assigned_msg = assigned_tpl.replace("{country}", country_tag)
+                    
+                    bot.edit_message_text(chat_id=chat_id, message_id=message_id, text=assigned_msg, parse_mode="HTML", reply_markup=markup)
+                else:
+                    markup = types.InlineKeyboardMarkup()
+                    markup.add(types.InlineKeyboardButton("🔙 Choose Another Country", callback_data=f"svc_{service}"))
+                    no_num_tpl = get_setting("msg_no_number", "⚠️ <b>দুঃখিত! বর্তমানে {country} দেশের কোনো চালু নাম্বার খালি নেই।</b>")
+                    no_num_msg = no_num_tpl.replace("{country}", country_tag)
+                    bot.edit_message_text(chat_id=chat_id, message_id=message_id, text=no_num_msg, parse_mode="HTML", reply_markup=markup)
         except Exception as e:
-            print(e)
+            print("Error assigning country/number:", e)
 
     elif call.data.startswith("copy_"):
         copied_num = call.data.replace("copy_", "")
@@ -604,16 +628,18 @@ def callback_handler(call):
 
     elif call.data.startswith("wapp_") and chat_id == ADMIN_ID:
         _, w_id, u_id, amt = call.data.split("_")
-        cursor.execute("UPDATE withdrawals SET status = 'APPROVED' WHERE id = ?", (w_id,))
-        conn.commit()
+        with db_lock:
+            cursor.execute("UPDATE withdrawals SET status = 'APPROVED' WHERE id = ?", (w_id,))
+            conn.commit()
         bot.answer_callback_query(call.id, text="উইথড্র অ্যাপ্রুভ হয়েছে!")
         bot.edit_message_text(f"✅ <b>উইথড্র #{w_id} অ্যাপ্রুভ করা হয়েছে!</b>", chat_id, message_id, parse_mode="HTML")
         bot.send_message(int(u_id), f"🎉 <b>আপনার ${float(amt):.3f} উইথড্র সফলভাবে পরিশোধ করা হয়েছে!</b>", parse_mode="HTML")
 
     elif call.data.startswith("wrej_") and chat_id == ADMIN_ID:
         _, w_id, u_id, amt = call.data.split("_")
-        cursor.execute("UPDATE withdrawals SET status = 'REJECTED' WHERE id = ?", (w_id,))
-        conn.commit()
+        with db_lock:
+            cursor.execute("UPDATE withdrawals SET status = 'REJECTED' WHERE id = ?", (w_id,))
+            conn.commit()
         update_balance(int(u_id), float(amt))
         bot.answer_callback_query(call.id, text="উইথড্র বাতিল হয়েছে!")
         bot.edit_message_text(f"❌ <b>উইথড্র #{w_id} বাতিল করা হয়েছে এবং ব্যালেন্স ফেরত দেওয়া হয়েছে।</b>", chat_id, message_id, parse_mode="HTML")
@@ -637,8 +663,9 @@ def callback_handler(call):
 
     elif call.data == "adm_mng_svc" and chat_id == ADMIN_ID:
         bot.answer_callback_query(call.id)
-        cursor.execute("SELECT name FROM services")
-        svcs = [s[0] for s in cursor.fetchall()]
+        with db_lock:
+            cursor.execute("SELECT name FROM services")
+            svcs = [s[0] for s in cursor.fetchall()]
         markup = types.InlineKeyboardMarkup(row_width=2)
         markup.add(types.InlineKeyboardButton("➕ Add Service", callback_data="adm_add_svc"), types.InlineKeyboardButton("❌ Delete Service", callback_data="adm_del_svc"))
         markup.add(types.InlineKeyboardButton("🔙 Back to Admin", callback_data="adm_back_main"))
@@ -683,10 +710,16 @@ def callback_handler(call):
 
     elif call.data == "adm_list_num" and chat_id == ADMIN_ID:
         bot.answer_callback_query(call.id)
-        cursor.execute("SELECT country, number, status FROM numbers LIMIT 15")
-        nums = cursor.fetchall()
-        list_text = "📋 বটের নাম্বার লিস্ট:\n\n" + "\n".join([f"• <code>{n}</code> ({c}) - {s}" for c, n, s in nums]) if nums else "কোনো নাম্বার নেই।"
+        with db_lock:
+            cursor.execute("SELECT country, number, status FROM numbers LIMIT 25")
+            nums = cursor.fetchall()
+        list_text = "📋 বটের নাম্বার লিস্ট (সর্বোচ্চ ২৫টি):\n\n" + "\n".join([f"• <code>{n}</code> ({c}) - {s}" for c, n, s in nums]) if nums else "কোনো নাম্বার নেই।"
         bot.send_message(chat_id, list_text, parse_mode="HTML")
+
+    elif call.data == "adm_addbal" and chat_id == ADMIN_ID:
+        bot.answer_callback_query(call.id)
+        msg = bot.send_message(chat_id, "➕/➖ <b>ইউজার ব্যালেন্স পরিবর্তন:</b>\nফরম্যাট: <code>User_ID Amount</code>\nউদাহরণ যোগ করতে: <code>12345678 0.50</code>\nউদাহরণ কাটতে: <code>12345678 -0.50</code>", parse_mode="HTML", reply_markup=cancel_markup())
+        bot.register_next_step_handler(msg, do_modify_user_balance)
 
     elif call.data == "adm_broadcast" and chat_id == ADMIN_ID:
         bot.answer_callback_query(call.id)
@@ -713,6 +746,24 @@ def callback_handler(call):
         msg = bot.send_message(chat_id, "🎁 প্রতি ওটিপির রেট (ডলারে):", parse_mode="HTML", reply_markup=cancel_markup())
         bot.register_next_step_handler(msg, lambda m: save_setting_and_notify(m, "otp_rate", "প্রতি ওটিপির রেট"))
 
+def do_modify_user_balance(message):
+    if message.text in ["/cancel", "cancel", "বাতিল"]:
+        return
+    try:
+        parts = message.text.split()
+        target_uid = int(parts[0])
+        amt = float(parts[1])
+        new_b = update_balance(target_uid, amt)
+        bot.send_message(ADMIN_ID, f"✅ ইউজার <code>{target_uid}</code>-এর ব্যালেন্স আপডেট হয়েছে!\nনতুন ব্যালেন্স: <b>${new_b:.4f}</b>", parse_mode="HTML")
+        try:
+            action = "যোগ" if amt >= 0 else "কর্তন"
+            bot.send_message(target_uid, f"🔔 অ্যাডমিন আপনার অ্যাকাউন্টে <b>${abs(amt):.4f}</b> {action} করেছেন।\nনতুন ব্যালেন্স: <b>${new_b:.4f}</b>", parse_mode="HTML")
+        except:
+            pass
+    except Exception as e:
+        bot.send_message(ADMIN_ID, f"⚠️ ভুল ফরম্যাট! উদাহরণ: <code>12345678 0.50</code>\nএরর: {e}", parse_mode="HTML")
+    show_admin_panel(ADMIN_ID)
+
 def save_text_and_notify(message, txt_key):
     if message.text in ["/cancel", "cancel", "বাতিল"]:
         return
@@ -730,8 +781,9 @@ def do_add_service(message):
         return
     s_name = message.text.strip().upper()
     try:
-        cursor.execute("INSERT INTO services (name) VALUES (?)", (s_name,))
-        conn.commit()
+        with db_lock:
+            cursor.execute("INSERT INTO services (name) VALUES (?)", (s_name,))
+            conn.commit()
         bot.send_message(ADMIN_ID, f"✅ সফলভাবে <b>{s_name}</b> সার্ভিস যোগ করা হয়েছে!", parse_mode="HTML")
     except:
         bot.send_message(ADMIN_ID, "⚠️ এই সার্ভিসটি আগেই যোগ করা আছে!", parse_mode="HTML")
@@ -740,9 +792,10 @@ def do_del_service(message):
     if message.text in ["/cancel", "cancel", "বাতিল"]:
         return
     s_name = message.text.strip().upper()
-    cursor.execute("DELETE FROM services WHERE name = ?", (s_name,))
-    cursor.execute("DELETE FROM countries WHERE service_name = ?", (s_name,))
-    conn.commit()
+    with db_lock:
+        cursor.execute("DELETE FROM services WHERE name = ?", (s_name,))
+        cursor.execute("DELETE FROM countries WHERE service_name = ?", (s_name,))
+        conn.commit()
     bot.send_message(ADMIN_ID, f"✅ <b>{s_name}</b> সার্ভিস মুছে ফেলা হয়েছে!", parse_mode="HTML")
 
 def do_add_country(message):
@@ -751,18 +804,20 @@ def do_add_country(message):
     try:
         parts = [p.strip() for p in message.text.split("|")]
         s_name, d_name, c_tag = parts[0].upper(), parts[1], parts[2]
-        cursor.execute("INSERT INTO countries (service_name, display_name, country_tag) VALUES (?, ?, ?)", (s_name, d_name, c_tag))
-        conn.commit()
+        with db_lock:
+            cursor.execute("INSERT INTO countries (service_name, display_name, country_tag) VALUES (?, ?, ?)", (s_name, d_name, c_tag))
+            conn.commit()
         bot.send_message(ADMIN_ID, f"✅ সফলভাবে <b>{s_name}</b> সার্ভিসে দেশ <b>{d_name}</b> যোগ করা হয়েছে!", parse_mode="HTML")
     except:
-        bot.send_message(ADMIN_ID, "⚠️ ফরম্যাট ভুল!", parse_mode="HTML")
+        bot.send_message(ADMIN_ID, "⚠️ ফরম্যাট ভুল! উদাহরণ:\n<code>FACEBOOK | 🇧🇯 Benin 638 🔥 (450) | Benin</code>", parse_mode="HTML")
 
 def do_del_country(message):
     if message.text in ["/cancel", "cancel", "বাতিল"]:
         return
     c_tag = message.text.strip()
-    cursor.execute("DELETE FROM countries WHERE country_tag LIKE ?", (f"%{c_tag}%",))
-    conn.commit()
+    with db_lock:
+        cursor.execute("DELETE FROM countries WHERE country_tag LIKE ?", (f"%{c_tag}%",))
+        conn.commit()
     bot.send_message(ADMIN_ID, f"✅ সফলভাবে <b>{c_tag}</b> দেশের বাটন মুছে ফেলা হয়েছে!", parse_mode="HTML")
 
 def save_setting_and_notify(message, key, name):
@@ -779,14 +834,15 @@ def do_add_numbers(message):
         country = parts[0]
         number_list = parts[1:]
         added = 0
-        for num in number_list:
-            clean_n = num.strip().replace(" ", "").replace("-", "")
-            try:
-                cursor.execute("INSERT INTO numbers (country, number) VALUES (?, ?)", (country, clean_n))
-                added += 1
-            except:
-                pass
-        conn.commit()
+        with db_lock:
+            for num in number_list:
+                clean_n = num.strip().replace(" ", "").replace("-", "")
+                try:
+                    cursor.execute("INSERT INTO numbers (country, number) VALUES (?, ?)", (country, clean_n))
+                    added += 1
+                except:
+                    pass
+            conn.commit()
         bot.send_message(ADMIN_ID, f"✅ সফলভাবে <b>{country}</b> দেশের <b>{added} টি নাম্বার</b> যোগ হয়েছে!", parse_mode="HTML")
     except:
         bot.send_message(ADMIN_ID, "⚠️ ভুল ফরম্যাট!", parse_mode="HTML")
@@ -794,13 +850,18 @@ def do_add_numbers(message):
 def do_broadcast(message):
     if message.text in ["/cancel", "cancel", "বাতিল"]:
         return
-    cursor.execute("SELECT user_id FROM users")
-    for (u_id,) in cursor.fetchall():
+    with db_lock:
+        cursor.execute("SELECT user_id FROM users")
+        user_list = cursor.fetchall()
+    
+    sent = 0
+    for (u_id,) in user_list:
         try:
-            bot.send_message(u_id, f"📢 ADMIN NOTICE:\n\n{message.text}")
+            bot.send_message(u_id, f"📢 <b>ADMIN NOTICE:</b>\n\n{message.text}", parse_mode="HTML")
+            sent += 1
         except:
             pass
-    bot.send_message(ADMIN_ID, "✅ ব্রডকাস্ট সম্পন্ন!", parse_mode="HTML")
+    bot.send_message(ADMIN_ID, f"✅ ব্রডকাস্ট সম্পন্ন! মোট <b>{sent}</b> জনের কাছে মেসেজ পাঠানো হয়েছে।", parse_mode="HTML")
 
-print("NEOX FAST SMS [Clean Support Button Online] চালু হয়েছে...")
+print("NEOX FAST SMS [Optimized & Bug-free] চালু হয়েছে...")
 bot.infinity_polling()
